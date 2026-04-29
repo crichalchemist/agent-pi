@@ -1,5 +1,5 @@
 import { AuthStorage, ModelRegistry, SessionManager } from '@mariozechner/pi-coding-agent';
-import type { PiClient, SessionFactory } from './types.js';
+import type { ActiveSession, PiClient, SessionFactory } from './types.js';
 type ModelRegistryLike = {
     getAvailable: () => Array<{
         provider: string;
@@ -9,6 +9,12 @@ type ModelRegistryLike = {
         id: string;
     }>>;
 };
+type PiSessionLike = {
+    steer: (text: string) => Promise<void>;
+    abort: () => Promise<void>;
+    subscribe: (listener: (event: unknown) => void) => () => void;
+};
+export declare const makePiSessionAdapter: (piSession: PiSessionLike) => ActiveSession;
 export declare const makePiSessionFactory: (deps: {
     authStorage: AuthStorage;
     modelRegistry: ModelRegistry;

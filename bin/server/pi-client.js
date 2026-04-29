@@ -1,24 +1,44 @@
 import { createAgentSession, } from '@mariozechner/pi-coding-agent';
 import { getTier } from './types.js';
-// Production adapter: bridges Pi's AgentSession to our ActiveSession interface.
-// subscribe maps Pi's 'message_update' events to text deltas and 'agent_end' to onEnd.
-// If the Pi SDK's MessageEvent shape changes, update the content_block_delta check below.
-const adaptPiSession = (piSession) => ({
-    steer: (text) => piSession.steer(text),
-    abort: () => piSession.abort(),
-    subscribe: (onDelta, onEnd, onError) => piSession.subscribe((event) => {
-        if (event.type === 'message_update') {
-            const e = event.assistantMessageEvent;
-            if (e['type'] === 'content_block_delta' &&
-                e['delta']?.['type'] === 'text_delta') {
-                onDelta(String(e['delta']['text'] ?? ''));
-            }
+const dispatchEvent = (event, onDelta, onEnd) => {
+    const e = event;
+    if (e['type'] === 'message_update') {
+        const ame = e['assistantMessageEvent'];
+        if (ame?.['type'] === 'content_block_delta' &&
+            ame['delta']?.['type'] === 'text_delta') {
+            onDelta(String(ame['delta']['text'] ?? ''));
         }
-        else if (event.type === 'agent_end') {
-            onEnd();
+    }
+    else if (e['type'] === 'agent_end') {
+        onEnd();
+    }
+};
+// Exported for unit testing — adapts any PiSession-like object to ActiveSession.
+// Subscribes immediately on construction to buffer events, then drains the buffer
+// when the caller's subscribe() arrives (prevents race with fast completions).
+export const makePiSessionAdapter = (piSession) => {
+    const buffered = [];
+    let forward = null;
+    piSession.subscribe((event) => {
+        if (forward) {
+            forward(event);
         }
-    }),
-});
+        else {
+            buffered.push(event);
+        }
+    });
+    return {
+        steer: (text) => piSession.steer(text),
+        abort: () => piSession.abort(),
+        subscribe: (onDelta, onEnd, _onError) => {
+            forward = (event) => dispatchEvent(event, onDelta, onEnd);
+            for (const e of buffered)
+                forward(e);
+            buffered.length = 0;
+            return () => { forward = null; };
+        },
+    };
+};
 // Production session factory. Requires Pi auth to be configured via `pi auth` or
 // provider env vars (ANTHROPIC_API_KEY, GEMINI_API_KEY, etc.) before calling.
 export const makePiSessionFactory = (deps) => async (task, modelKey, cwd) => {
@@ -34,8 +54,11 @@ export const makePiSessionFactory = (deps) => async (task, modelKey, cwd) => {
         modelRegistry: deps.modelRegistry,
         sessionManager: deps.sessionManager,
     });
+    // Adapter subscribes to piSession immediately — buffers events until our
+    // caller's subscribe() arrives, preventing loss of fast completions.
+    const adapted = makePiSessionAdapter(session);
     await session.prompt(task);
-    return adaptPiSession(session);
+    return adapted;
 };
 export const makePiClient = (factory, modelRegistry) => ({
     startSession: (task, modelKey, cwd) => factory(task, modelKey, cwd),

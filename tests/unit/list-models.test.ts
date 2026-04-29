@@ -1,0 +1,81 @@
+import { describe, it, expect, vi } from 'vitest'
+import { run } from '../../src/monitor/list-models.js'
+
+describe('list-models monitor', () => {
+  it('happy path: formats available models and exits 0', async () => {
+    const getAvailable = vi.fn(() => [
+      { provider: 'google', id: 'gemini-2.5-pro' },
+      { provider: 'google', id: 'gemini-2.0-flash' },
+    ])
+    const output = vi.fn()
+    const exit = vi.fn()
+
+    await run({ getAvailable, output, exit })
+
+    expect(output).toHaveBeenCalledOnce()
+    expect(output).toHaveBeenCalledWith(
+      '[pi-models] Available: gemini-2.5-pro (frontier), gemini-2.0-flash (fast) — use pi_list_models to refresh'
+    )
+    expect(exit).toHaveBeenCalledWith(0)
+  })
+
+  it('empty models: outputs no-models message and exits 0', async () => {
+    const getAvailable = vi.fn(() => [])
+    const output = vi.fn()
+    const exit = vi.fn()
+
+    await run({ getAvailable, output, exit })
+
+    expect(output).toHaveBeenCalledOnce()
+    expect(output).toHaveBeenCalledWith(
+      '[pi-models] No models available — configure Pi auth with `pi auth` or set provider env vars'
+    )
+    expect(exit).toHaveBeenCalledWith(0)
+  })
+
+  it('exception path: output NOT called, exits 1', async () => {
+    const getAvailable = vi.fn(() => { throw new Error('auth failed') })
+    const output = vi.fn()
+    const exit = vi.fn()
+
+    await run({ getAvailable, output, exit })
+
+    expect(output).not.toHaveBeenCalled()
+    expect(exit).toHaveBeenCalledWith(1)
+  })
+
+  it('tier labels: frontier / fast / balanced', async () => {
+    const output = vi.fn()
+    const exit = vi.fn()
+
+    await run({
+      getAvailable: () => [
+        { provider: 'google', id: 'gemini-2.5-pro' },
+        { provider: 'google', id: 'gemini-2.0-flash' },
+        { provider: 'acme', id: 'totally-unknown-model' },
+      ],
+      output,
+      exit,
+    })
+
+    const line: string = output.mock.calls[0][0]
+    expect(line).toContain('gemini-2.5-pro (frontier)')
+    expect(line).toContain('gemini-2.0-flash (fast)')
+    expect(line).toContain('totally-unknown-model (balanced)')
+  })
+
+  it('formatting: line starts with [pi-models] Available: and ends with — use pi_list_models to refresh', async () => {
+    const output = vi.fn()
+    const exit = vi.fn()
+
+    await run({
+      getAvailable: () => [{ provider: 'google', id: 'gemini-2.5-pro' }],
+      output,
+      exit,
+    })
+
+    const line: string = output.mock.calls[0][0]
+    expect(line.startsWith('[pi-models] Available:')).toBe(true)
+    expect(line.endsWith('— use pi_list_models to refresh')).toBe(true)
+  })
+})

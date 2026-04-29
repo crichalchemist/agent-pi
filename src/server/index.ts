@@ -20,6 +20,10 @@ const store = makeSessionStore()
 const factory = makePiSessionFactory(sessionDeps)
 const client = makePiClient(factory, modelRegistry)
 const { tools: toolHandlers, schemas } = makeTools(store, client)
+// Each handler has a specific typed params interface (RunTaskParams, SpawnParams, etc.) to keep
+// tool implementations type-safe internally. At the MCP dispatch boundary we need a uniform
+// index-by-string type; the as unknown as cast is intentional — MCP args arrive untyped and
+// each handler validates its own required fields at runtime.
 const tools = toolHandlers as unknown as Record<string, (args: Record<string, unknown>) => Promise<unknown>>
 
 const server = new Server(
@@ -43,9 +47,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [{ type: 'text' as const, text: JSON.stringify(result) }],
     }
   } catch (err) {
+    // PiError objects are plain discriminated unions — String(obj) produces "[object Object]".
+    // JSON.stringify preserves the kind and contextual fields for the MCP caller.
     throw new McpError(
       ErrorCode.InternalError,
-      err instanceof Error ? err.message : String(err)
+      err instanceof Error ? err.message : JSON.stringify(err)
     )
   }
 })

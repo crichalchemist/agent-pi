@@ -130,7 +130,10 @@ export const makeTools = (store: SessionStore, client: PiClient) => {
 
       store.add(session_id, { session, output: '', status: 'running', createdAt: Date.now(), model })
 
-      const unsubscribe = session.subscribe(
+      // Declared before subscribe so onEnd/onError callbacks can call unsubscribe()
+      // without hitting a temporal dead zone (same pattern as pi_run_task).
+      let unsubscribe: () => void = () => {}
+      unsubscribe = session.subscribe(
         (delta) => {
           const e = store.get(session_id)
           if (e) store.update(session_id, { output: e.output + delta })

@@ -85,6 +85,11 @@ export const makeTools = (store, client) => {
             return new Promise((resolve) => {
                 let output = '';
                 let settled = false;
+                // Both declared before subscribe so settle() is safe to call synchronously
+                // during buffer drain (before handle/unsubscribe are assigned).
+                // clearTimeout(undefined) and the no-op unsub are both safe.
+                let handle;
+                let unsubscribe = () => { };
                 const settle = (value) => {
                     if (settled)
                         return;
@@ -93,8 +98,8 @@ export const makeTools = (store, client) => {
                     unsubscribe();
                     resolve(value);
                 };
-                const unsubscribe = session.subscribe((delta) => { output += delta; }, () => { settle({ output }); }, (err) => { settle({ output, error: err }); });
-                const handle = setTimeout(() => {
+                unsubscribe = session.subscribe((delta) => { output += delta; }, () => { settle({ output }); }, (err) => { settle({ output, error: err }); });
+                handle = setTimeout(() => {
                     session.abort();
                     settle({ output, timedOut: true });
                 }, timeout);

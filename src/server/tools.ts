@@ -96,6 +96,11 @@ export const makeTools = (store: SessionStore, client: PiClient) => {
       return new Promise<{ output: string; timedOut?: true; error?: string }>((resolve) => {
         let output = ''
         let settled = false
+        // Both declared before subscribe so settle() is safe to call synchronously
+        // during buffer drain (before handle/unsubscribe are assigned).
+        // clearTimeout(undefined) and the no-op unsub are both safe.
+        let handle: ReturnType<typeof setTimeout>
+        let unsubscribe: () => void = () => {}
 
         const settle = (value: { output: string; timedOut?: true; error?: string }) => {
           if (settled) return
@@ -105,13 +110,13 @@ export const makeTools = (store: SessionStore, client: PiClient) => {
           resolve(value)
         }
 
-        const unsubscribe = session.subscribe(
+        unsubscribe = session.subscribe(
           (delta) => { output += delta },
           ()      => { settle({ output }) },
           (err)   => { settle({ output, error: err }) }
         )
 
-        const handle = setTimeout(() => {
+        handle = setTimeout(() => {
           session.abort()
           settle({ output, timedOut: true })
         }, timeout)

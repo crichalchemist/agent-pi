@@ -3,10 +3,11 @@ import { getTier } from './types.js';
 const dispatchEvent = (event, onDelta, onEnd) => {
     const e = event;
     if (e['type'] === 'message_update') {
+        // Pi SDK normalizes all providers to AssistantMessageEvent.
+        // text_delta events carry delta: string directly (not Anthropic's raw format).
         const ame = e['assistantMessageEvent'];
-        if (ame?.['type'] === 'content_block_delta' &&
-            ame['delta']?.['type'] === 'text_delta') {
-            onDelta(String(ame['delta']['text'] ?? ''));
+        if (ame?.['type'] === 'text_delta') {
+            onDelta(String(ame['delta'] ?? ''));
         }
     }
     else if (e['type'] === 'agent_end') {

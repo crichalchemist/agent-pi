@@ -25,12 +25,11 @@ const dispatchEvent = (
 ) => {
   const e = event as Record<string, unknown>
   if (e['type'] === 'message_update') {
+    // Pi SDK normalizes all providers to AssistantMessageEvent.
+    // text_delta events carry delta: string directly (not Anthropic's raw format).
     const ame = e['assistantMessageEvent'] as Record<string, unknown>
-    if (
-      ame?.['type'] === 'content_block_delta' &&
-      (ame['delta'] as Record<string, unknown>)?.['type'] === 'text_delta'
-    ) {
-      onDelta(String((ame['delta'] as Record<string, unknown>)['text'] ?? ''))
+    if (ame?.['type'] === 'text_delta') {
+      onDelta(String(ame['delta'] ?? ''))
     }
   } else if (e['type'] === 'agent_end') {
     onEnd()

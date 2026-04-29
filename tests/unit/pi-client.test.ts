@@ -13,12 +13,10 @@ const makeMockPiSession = () => {
   }
 }
 
+// Pi SDK's normalized AssistantMessageEvent format (same across all providers)
 const textDeltaEvent = (text: string) => ({
   type: 'message_update',
-  assistantMessageEvent: {
-    type: 'content_block_delta',
-    delta: { type: 'text_delta', text },
-  },
+  assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: text },
 })
 const agentEndEvent = () => ({ type: 'agent_end', messages: [] })
 
@@ -129,11 +127,12 @@ describe('makePiSessionAdapter event buffering', () => {
     expect(onDelta).toHaveBeenCalledTimes(1)  // only from first subscribe
   })
 
-  it('ignores non-text-delta message_update events', () => {
+  it('ignores non-text-delta message_update events (thinking, toolcall, etc.)', () => {
     const pi = makeMockPiSession()
     const adapted = makePiSessionAdapter(pi)
 
-    pi.emit({ type: 'message_update', assistantMessageEvent: { type: 'message_start' } })
+    pi.emit({ type: 'message_update', assistantMessageEvent: { type: 'thinking_delta', contentIndex: 0, delta: 'hmm' } })
+    pi.emit({ type: 'message_update', assistantMessageEvent: { type: 'toolcall_delta', contentIndex: 1, delta: '{}' } })
     pi.emit({ type: 'tool_execution_start', toolCallId: 'x', toolName: 'bash', args: {} })
 
     const onDelta = vi.fn()

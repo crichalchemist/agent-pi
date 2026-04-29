@@ -6,25 +6,22 @@ STATUS_FILE="${STATUS_FILE:-${HOME}/.claude/claude-pi/status.json}"
 
 [[ -f "$STATUS_FILE" ]] || exit 0
 
-running=$(python3 -c "import json,sys; d=json.load(open('$STATUS_FILE')); print(d.get('running',0))" 2>/dev/null)
-[[ "$running" =~ ^[0-9]+$ ]] || exit 0
-(( running == 0 )) && exit 0
+read -r running models bytes < <(python3 - "$STATUS_FILE" <<'EOF'
+import json, sys
 
-models=$(python3 -c "
-import json
-d = json.load(open('$STATUS_FILE'))
-print(', '.join(d.get('models', [])))
-" 2>/dev/null)
+d = json.load(open(sys.argv[1]))
+running = d.get('running', 0)
+if running == 0:
+    sys.exit(0)
 
-bytes=$(python3 -c "
-import json
-d = json.load(open('$STATUS_FILE'))
+models = ', '.join(d.get('models', []))
 b = d.get('totalOutputBytes', 0)
-if b >= 1024:
-    print(f'{b/1024:.1f}KB')
-else:
-    print(f'{b}B')
-" 2>/dev/null)
+size = f'{b/1024:.1f}KB' if b >= 1024 else f'{b}B'
+print(running, models, size)
+EOF
+) || exit 0
+
+[[ -z "$running" || "$running" == "0" ]] && exit 0
 
 if [[ -n "$models" ]]; then
   echo "Pi: ${running} running (${models}) | ${bytes}"

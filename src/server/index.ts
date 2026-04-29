@@ -65,6 +65,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 const transport = new StdioServerTransport()
 await server.connect(transport)
 
+// Write idle status immediately so stale data from a previous process is cleared.
+writeStatus().catch(() => {})
+
 const cleanup = () => {
   store.dispose()
   process.exit(0)

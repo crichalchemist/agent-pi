@@ -19,6 +19,7 @@ const textDeltaEvent = (text: string) => ({
   assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: text },
 })
 const agentEndEvent = () => ({ type: 'agent_end', messages: [] })
+const messageEndErrorEvent = (msg: string) => ({ type: 'message_end', stopReason: 'error', errorMessage: msg })
 
 // Minimal mock that satisfies ActiveSession
 const makeActiveSession = (): ActiveSession => ({
@@ -125,6 +126,36 @@ describe('makePiSessionAdapter event buffering', () => {
     // Re-subscribing after unsubscribe should NOT replay old events
     const unsub = adapted.subscribe(vi.fn(), vi.fn(), vi.fn())
     expect(onDelta).toHaveBeenCalledTimes(1)  // only from first subscribe
+  })
+
+  it('calls onError (not onEnd) when agent_end follows message_end with stopReason error', () => {
+    const pi = makeMockPiSession()
+    const adapted = makePiSessionAdapter(pi)
+
+    const onEnd   = vi.fn()
+    const onError = vi.fn()
+    adapted.subscribe(vi.fn(), onEnd, onError)
+
+    pi.emit(messageEndErrorEvent('400 provider rejected request'))
+    pi.emit(agentEndEvent())
+
+    expect(onError).toHaveBeenCalledWith('400 provider rejected request')
+    expect(onEnd).not.toHaveBeenCalled()
+  })
+
+  it('calls onEnd (not onError) when agent_end follows a non-error message_end', () => {
+    const pi = makeMockPiSession()
+    const adapted = makePiSessionAdapter(pi)
+
+    const onEnd   = vi.fn()
+    const onError = vi.fn()
+    adapted.subscribe(vi.fn(), onEnd, onError)
+
+    pi.emit({ type: 'message_end', stopReason: 'end_turn' })
+    pi.emit(agentEndEvent())
+
+    expect(onEnd).toHaveBeenCalledTimes(1)
+    expect(onError).not.toHaveBeenCalled()
   })
 
   it('ignores non-text-delta message_update events (thinking, toolcall, etc.)', () => {

@@ -57,6 +57,19 @@ describe('pi_run_task', () => {
     expect(client.startSession).toHaveBeenCalledWith('x', 'google/gemini-2.0-flash', process.cwd())
   })
 
+  it('returns error field when agent errors before completing', async () => {
+    const session = makeSession({
+      subscribe: vi.fn((onDelta, _onEnd, onError) => {
+        setTimeout(() => { onDelta('partial output'); onError('400 model rejected request') }, 0)
+        return () => {}
+      }),
+    })
+    const { tools } = makeTools(makeSessionStore(), makeClient(session))
+    const result = await tools.pi_run_task({ task: 'x', model: 'google/gemini-2.0-flash' })
+    expect(result.error).toBe('400 model rejected request')
+    expect(result.output).toBe('partial output')
+  })
+
   it('returns partial output on timeout', async () => {
     vi.useFakeTimers()
     const session = makeSession({

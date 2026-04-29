@@ -1,19 +1,5 @@
 import { createAgentSession, } from '@mariozechner/pi-coding-agent';
 import { getTier } from './types.js';
-const dispatchEvent = (event, onDelta, onEnd) => {
-    const e = event;
-    if (e['type'] === 'message_update') {
-        // Pi SDK normalizes all providers to AssistantMessageEvent.
-        // text_delta events carry delta: string directly (not Anthropic's raw format).
-        const ame = e['assistantMessageEvent'];
-        if (ame?.['type'] === 'text_delta') {
-            onDelta(String(ame['delta'] ?? ''));
-        }
-    }
-    else if (e['type'] === 'agent_end') {
-        onEnd();
-    }
-};
 // Exported for unit testing — adapts any PiSession-like object to ActiveSession.
 // Subscribes immediately on construction to buffer events, then drains the buffer
 // when the caller's subscribe() arrives (prevents race with fast completions).
@@ -31,8 +17,32 @@ export const makePiSessionAdapter = (piSession) => {
     return {
         steer: (text) => piSession.steer(text),
         abort: () => piSession.abort(),
-        subscribe: (onDelta, onEnd, _onError) => {
-            forward = (event) => dispatchEvent(event, onDelta, onEnd);
+        subscribe: (onDelta, onEnd, onError) => {
+            // Tracks error from message_end so agent_end can route to onError instead of onEnd.
+            // Pi SDK fires message_end { stopReason: 'error' } before agent_end on provider failures.
+            let pendingError = null;
+            forward = (event) => {
+                const e = event;
+                if (e['type'] === 'message_update') {
+                    // Pi SDK normalizes all providers to AssistantMessageEvent.
+                    // text_delta events carry delta: string directly (not Anthropic's raw format).
+                    const ame = e['assistantMessageEvent'];
+                    if (ame?.['type'] === 'text_delta') {
+                        onDelta(String(ame['delta'] ?? ''));
+                    }
+                }
+                else if (e['type'] === 'message_end' && e['stopReason'] === 'error') {
+                    pendingError = String(e['errorMessage'] ?? 'Pi agent error');
+                }
+                else if (e['type'] === 'agent_end') {
+                    if (pendingError) {
+                        onError(pendingError);
+                    }
+                    else {
+                        onEnd();
+                    }
+                }
+            };
             for (const e of buffered)
                 forward(e);
             buffered.length = 0;

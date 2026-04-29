@@ -93,7 +93,7 @@ export const makeTools = (store, client) => {
                     unsubscribe();
                     resolve(value);
                 };
-                const unsubscribe = session.subscribe((delta) => { output += delta; }, () => { settle({ output }); }, (_err) => { settle({ output }); });
+                const unsubscribe = session.subscribe((delta) => { output += delta; }, () => { settle({ output }); }, (err) => { settle({ output, error: err }); });
                 const handle = setTimeout(() => {
                     session.abort();
                     settle({ output, timedOut: true });

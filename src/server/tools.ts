@@ -93,11 +93,11 @@ export const makeTools = (store: SessionStore, client: PiClient) => {
       const resolvedCwd = cwd ?? process.cwd()
       const session = await client.startSession(task, model, resolvedCwd)
 
-      return new Promise<{ output: string; timedOut?: true }>((resolve) => {
+      return new Promise<{ output: string; timedOut?: true; error?: string }>((resolve) => {
         let output = ''
         let settled = false
 
-        const settle = (value: { output: string; timedOut?: true }) => {
+        const settle = (value: { output: string; timedOut?: true; error?: string }) => {
           if (settled) return
           settled = true
           clearTimeout(handle)
@@ -108,7 +108,7 @@ export const makeTools = (store: SessionStore, client: PiClient) => {
         const unsubscribe = session.subscribe(
           (delta) => { output += delta },
           ()      => { settle({ output }) },
-          (_err)  => { settle({ output }) }
+          (err)   => { settle({ output, error: err }) }
         )
 
         const handle = setTimeout(() => {

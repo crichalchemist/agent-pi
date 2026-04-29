@@ -127,6 +127,7 @@ export declare const makeTools: (store: SessionStore, client: PiClient) => {
         pi_run_task: ({ task, model, cwd, timeout }: RunTaskParams) => Promise<{
             output: string;
             timedOut?: true;
+            error?: string;
         }>;
         pi_spawn_agent: ({ task, model, cwd }: SpawnParams) => Promise<{
             session_id: `${string}-${string}-${string}-${string}-${string}`;

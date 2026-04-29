@@ -30,7 +30,7 @@ A native Claude Code plugin with three self-contained parts:
 ```
 claude-pi/
 ├── .claude-plugin/
-│   └── plugin.json          # Manifest + userConfig for Pi credentials
+│   └── plugin.json          # Plugin manifest (no userConfig — Pi manages its own auth)
 ├── skills/
 │   └── orchestrate/
 │       └── SKILL.md         # Orchestration strategy skill
@@ -59,33 +59,23 @@ claude-pi/
   "mcpServers": {
     "pi": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/server.js"],
-      "env": {
-        "PI_API_KEY": "${CLAUDE_PLUGIN_OPTION_PI_API_KEY}"
-      }
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/server.js"]
     }
   }
 }
 ```
 
-**`plugin.json` userConfig** — credentials collected at enable time, stored in system keychain:
+**`plugin.json`** — no `userConfig` needed; Pi handles its own auth via `AuthStorage`:
 ```json
 {
   "name": "claude-pi",
   "version": "1.0.0",
   "description": "Orchestrate Pi agents from Claude Code for cost-effective task delegation",
-  "license": "MIT",
-  "userConfig": {
-    "pi_api_key": {
-      "type": "string",
-      "title": "Pi API Key",
-      "description": "Your Pi API key from pi.dev",
-      "sensitive": true,
-      "required": true
-    }
-  }
+  "license": "MIT"
 }
 ```
+
+**Auth model:** Pi has no own API key. The SDK's `AuthStorage.create()` reads `~/.pi/agent/auth.json` and standard provider env vars (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, etc.). Users configure Pi auth once via `pi auth` CLI; the plugin inherits that state at runtime. No credentials are injected by the plugin.
 
 ---
 
@@ -101,14 +91,14 @@ claude-pi/
 }]
 ```
 
-`list-models.ts` runs once at session start: connects to Pi using `PI_API_KEY`, fetches the model registry, emits a single formatted notification, exits. Claude receives the full model list before any user interaction.
+`list-models.ts` runs once at session start: calls `AuthStorage.create()` and `ModelRegistry.create(authStorage)` to discover available models (those with valid API keys), emits a single formatted notification, exits. Tier labels (`frontier`, `balanced`, `fast`) are derived from a static mapping keyed on Pi's model IDs — `ModelRegistry` supplies model IDs and provider names; the tier mapping lives in `list-models.ts`. Claude receives the full model list before any user interaction.
 
 Output format (one stdout line, delivered as a notification):
 ```
 [pi-models] Available: gemini-2.5-pro (frontier), gemini-2.0-flash (fast), claude-haiku-4-5 (fast), gpt-4o (balanced) — use pi_list_models to refresh
 ```
 
-If the monitor exits non-zero (bad key, Pi unreachable), no notification arrives. The skill handles this gracefully (see Skill section).
+If the monitor exits non-zero (Pi auth not configured, auth file missing), no notification arrives. The skill handles this gracefully (see Skill section).
 
 ---
 
@@ -120,11 +110,20 @@ If the monitor exits non-zero (bad key, Pi unreachable), no notification arrives
 
 ```typescript
 // server/index.ts
+import { AuthStorage, ModelRegistry, SessionManager, createAgentSession }
+  from "@mariozechner/pi-coding-agent"
+
+const authStorage   = AuthStorage.create()
+const modelRegistry = ModelRegistry.create(authStorage)
+const sessionDeps   = { authStorage, modelRegistry, sessionManager: SessionManager.inMemory() }
+
 const store  = makeSessionStore()
-const client = makePiClient(createAgentSession)  // real Pi SDK
+const client = makePiClient(createAgentSession, sessionDeps)  // real Pi SDK
 const tools  = makeTools(store, client)
-// In tests: makePiClient(mockSessionFactory)
+// In tests: makePiClient(mockSessionFactory, mockDeps)
 ```
+
+**Build:** `tsc` compiles `src/` to `bin/` via a `prepublishOnly` npm script. No bundler required — output is plain CommonJS targeting Node 20+.
 
 ### Tool Reference
 
@@ -138,7 +137,7 @@ const tools  = makeTools(store, client)
 | `pi_get_result` | `session_id` | `{ output: string }` |
 | `pi_terminate_agent` | `session_id` | `{ output: string }` |
 
-**`pi_run_task`** — creates a Pi session, sends task, awaits `agent_end` event, returns accumulated output. Accepts optional `cwd` (defaults to Claude's working directory) and `timeout` in ms (default 5 min).
+**`pi_run_task`** — creates a Pi session, sends task, awaits `agent_end` event, returns accumulated output. Accepts optional `cwd` (defaults to Claude's working directory) and `timeout` in ms (default 5 min). On timeout, aborts the session and returns whatever output accumulated so far with a `session_timeout` error — partial output is included so Claude can decide whether to retry or synthesize from it.
 
 **`pi_spawn_agent`** — creates a Pi session, subscribes to events for output accumulation, returns `session_id` immediately. Does not wait for completion.
 
@@ -175,7 +174,7 @@ type SessionStore = {
 }
 ```
 
-All updates use `{ ...entry, ...patch }` — entries are immutable after creation. Output accumulates via append-on-delta, never in-place mutation.
+All updates use `{ ...entry, ...patch }` — entries are immutable after creation. Output accumulates via append-on-delta, never in-place mutation. Session IDs are generated with `crypto.randomUUID()` at spawn time.
 
 **Stale session cleanup** — sessions older than 30 minutes pruned on a 5-minute interval. Prevents unbounded memory growth from abandoned agents. TTL configurable via `PI_SESSION_TTL_MS` env var.
 
@@ -302,10 +301,6 @@ Not automated CI — scenarios are committed markdown files run manually during 
 
 1. Publish to a public GitHub repository (`github:<owner>/claude-pi`)
 2. Users install with: `claude /plugin install github:<owner>/claude-pi`
-3. On enable, Claude Code prompts for Pi API key (stored in system keychain)
+3. Users must have Pi auth configured before the plugin is useful — run `pi auth` or set provider env vars (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, etc.). The plugin README documents this prerequisite.
 4. Submit to Anthropic official marketplace once stable
 
-## Open Questions
-
-- Does Pi's model registry API require a running Pi session or is it a standalone endpoint? (Determines `list-models.ts` implementation complexity)
-- Does `@mariozechner/pi-coding-agent` export `createAgentSession` directly or require additional setup (auth storage, model registry instantiation)?

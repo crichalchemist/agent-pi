@@ -12,7 +12,7 @@
       "version": "1.0.0",
       "source": "./",
       "license": "MIT",
-      "repository": "https://github.com/<owner>/claude-pi",
+      "repository": "https://github.com/crichalchemist/agent-pi",
       "keywords": ["pi", "agents", "orchestration", "delegation", "mcp"],
       "author": {
         "name": "Courtney Andrew Richardson",

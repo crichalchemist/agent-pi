@@ -32,7 +32,7 @@ The plugin inherits whichever providers Pi has access to. Models without a valid
 ## Installation
 
 ```bash
-claude /plugin install github:<owner>/claude-pi
+claude /plugin install github:crichalchemist/agent-pi
 ```
 
 No build step required — compiled files are included in the repository.

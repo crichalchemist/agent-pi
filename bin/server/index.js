@@ -5,11 +5,17 @@ import { AuthStorage, ModelRegistry, SessionManager } from '@mariozechner/pi-cod
 import { makeSessionStore } from './session-store.js';
 import { makePiClient, makePiSessionFactory } from './pi-client.js';
 import { makeTools } from './tools.js';
+import { makeStatusWriter } from './status-writer.js';
 const authStorage = AuthStorage.create();
 const modelRegistry = ModelRegistry.create(authStorage);
 const sessionManager = SessionManager.inMemory();
 const sessionDeps = { authStorage, modelRegistry, sessionManager };
-const store = makeSessionStore();
+// writeStatus is assigned after store creation; onChange only fires post-construction
+let writeStatus;
+const store = makeSessionStore({
+    onChange: () => { writeStatus?.().catch(() => { }); },
+});
+writeStatus = makeStatusWriter({ store });
 const factory = makePiSessionFactory(sessionDeps);
 const client = makePiClient(factory, modelRegistry);
 const { tools: toolHandlers, schemas } = makeTools(store, client);

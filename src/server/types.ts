@@ -27,6 +27,7 @@ export type SessionEntry = {
   readonly status: SessionStatus
   readonly error?: string
   readonly createdAt: number
+  readonly model?: string
 }
 
 export type SessionStore = {

@@ -104,7 +104,7 @@ export const makeTools = (store, client) => {
             const session_id = randomUUID();
             const resolvedCwd = cwd ?? process.cwd();
             const session = await client.startSession(task, model, resolvedCwd);
-            store.add(session_id, { session, output: '', status: 'running', createdAt: Date.now() });
+            store.add(session_id, { session, output: '', status: 'running', createdAt: Date.now(), model });
             const unsubscribe = session.subscribe((delta) => {
                 const e = store.get(session_id);
                 if (e)

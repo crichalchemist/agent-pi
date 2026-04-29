@@ -87,4 +87,41 @@ describe('makeSessionStore', () => {
     store.dispose()
     delete process.env.PI_SESSION_TTL_MS
   })
+
+  it('onChange called on add', () => {
+    const onChange = vi.fn()
+    const store = makeSessionStore({ onChange })
+    store.add('a', entry())
+    expect(onChange).toHaveBeenCalledTimes(1)
+    store.dispose()
+  })
+
+  it('onChange called on update', () => {
+    const onChange = vi.fn()
+    const store = makeSessionStore({ onChange })
+    store.add('a', entry())
+    onChange.mockClear()
+    store.update('a', { status: 'done' })
+    expect(onChange).toHaveBeenCalledTimes(1)
+    store.dispose()
+  })
+
+  it('onChange called on remove', () => {
+    const onChange = vi.fn()
+    const store = makeSessionStore({ onChange })
+    store.add('a', entry())
+    onChange.mockClear()
+    store.remove('a')
+    expect(onChange).toHaveBeenCalledTimes(1)
+    store.dispose()
+  })
+
+  it('onChange NOT called on dispose', () => {
+    const onChange = vi.fn()
+    const store = makeSessionStore({ onChange })
+    store.add('a', entry())
+    onChange.mockClear()
+    store.dispose()
+    expect(onChange).not.toHaveBeenCalled()
+  })
 })

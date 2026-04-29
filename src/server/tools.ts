@@ -123,7 +123,7 @@ export const makeTools = (store: SessionStore, client: PiClient) => {
       const resolvedCwd = cwd ?? process.cwd()
       const session = await client.startSession(task, model, resolvedCwd)
 
-      store.add(session_id, { session, output: '', status: 'running', createdAt: Date.now() })
+      store.add(session_id, { session, output: '', status: 'running', createdAt: Date.now(), model })
 
       const unsubscribe = session.subscribe(
         (delta) => {

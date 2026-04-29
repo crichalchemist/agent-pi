@@ -33,8 +33,19 @@ describe('list-models monitor', () => {
     expect(exit).toHaveBeenCalledWith(0)
   })
 
-  it('exception path: output NOT called, exits 1', async () => {
+  it('exception path (sync): output NOT called, exits 1', async () => {
     const getAvailable = vi.fn(() => { throw new Error('auth failed') })
+    const output = vi.fn()
+    const exit = vi.fn()
+
+    await run({ getAvailable, output, exit })
+
+    expect(output).not.toHaveBeenCalled()
+    expect(exit).toHaveBeenCalledWith(1)
+  })
+
+  it('exception path (async rejection): output NOT called, exits 1', async () => {
+    const getAvailable = vi.fn(() => Promise.reject(new Error('network timeout')))
     const output = vi.fn()
     const exit = vi.fn()
 

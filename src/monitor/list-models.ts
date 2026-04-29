@@ -10,12 +10,15 @@ type RunOpts = {
   exit?: (code: number) => void
 }
 
+const LOG_PREFIX = '[pi-models]'
+const REFRESH_TOOL = 'pi_list_models'
+
 const NO_MODELS_MSG =
-  '[pi-models] No models available — configure Pi auth with `pi auth` or set provider env vars'
+  `${LOG_PREFIX} No models available — configure Pi auth with \`pi auth\` or set provider env vars`
 
 const formatLine = (models: ModelLike[]): string => {
   const parts = models.map(m => `${m.id} (${getTier(m.id)})`).join(', ')
-  return `[pi-models] Available: ${parts} — use pi_list_models to refresh`
+  return `${LOG_PREFIX} Available: ${parts} — use ${REFRESH_TOOL} to refresh`
 }
 
 const defaultGetAvailable = (): ModelLike[] => {
@@ -39,7 +42,8 @@ export const run = async (opts: RunOpts = {}): Promise<void> => {
       output(formatLine(models))
     }
     exit(0)
-  } catch {
+  } catch (err) {
+    console.error(`${LOG_PREFIX} Failed to load models:`, err instanceof Error ? err.message : String(err))
     exit(1)
   }
 }

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "pi": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/server.js"],
+      "env": {
+        "CLAUDE_PLUGIN_ROOT": "/Volumes/Containers/agent-pi"
+      }
+    }
+  }
+}

@@ -31,8 +31,12 @@ export const makePiSessionAdapter = (piSession) => {
                         onDelta(String(ame['delta'] ?? ''));
                     }
                 }
-                else if (e['type'] === 'message_end' && e['stopReason'] === 'error') {
-                    pendingError = String(e['errorMessage'] ?? 'Pi agent error');
+                else if (e['type'] === 'message_end') {
+                    // Pi SDK nests stopReason/errorMessage inside e['message'], not at top level
+                    const msg = e['message'];
+                    if (msg?.['stopReason'] === 'error') {
+                        pendingError = String(msg['errorMessage'] ?? 'Pi agent error');
+                    }
                 }
                 else if (e['type'] === 'agent_end') {
                     if (pendingError) {

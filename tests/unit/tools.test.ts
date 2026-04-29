@@ -57,6 +57,20 @@ describe('pi_run_task', () => {
     expect(client.startSession).toHaveBeenCalledWith('x', 'google/gemini-2.0-flash', process.cwd())
   })
 
+  it('resolves correctly when onEnd fires synchronously during subscribe (buffered fast completion)', async () => {
+    const session = makeSession({
+      subscribe: vi.fn((onDelta, onEnd) => {
+        // Synchronous — simulates buffer drain in makePiSessionAdapter
+        onDelta('sync output')
+        onEnd()
+        return () => {}
+      }),
+    })
+    const { tools } = makeTools(makeSessionStore(), makeClient(session))
+    const result = await tools.pi_run_task({ task: 'x', model: 'google/gemini-2.0-flash' })
+    expect(result.output).toBe('sync output')
+  })
+
   it('returns error field when agent errors before completing', async () => {
     const session = makeSession({
       subscribe: vi.fn((onDelta, _onEnd, onError) => {

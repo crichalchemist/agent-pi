@@ -19,7 +19,8 @@ const textDeltaEvent = (text: string) => ({
   assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: text },
 })
 const agentEndEvent = () => ({ type: 'agent_end', messages: [] })
-const messageEndErrorEvent = (msg: string) => ({ type: 'message_end', stopReason: 'error', errorMessage: msg })
+// Pi SDK nests stopReason/errorMessage inside message, not at event top level
+const messageEndErrorEvent = (msg: string) => ({ type: 'message_end', message: { stopReason: 'error', errorMessage: msg } })
 
 // Minimal mock that satisfies ActiveSession
 const makeActiveSession = (): ActiveSession => ({
@@ -151,7 +152,7 @@ describe('makePiSessionAdapter event buffering', () => {
     const onError = vi.fn()
     adapted.subscribe(vi.fn(), onEnd, onError)
 
-    pi.emit({ type: 'message_end', stopReason: 'end_turn' })
+    pi.emit({ type: 'message_end', message: { stopReason: 'end_turn' } })
     pi.emit(agentEndEvent())
 
     expect(onEnd).toHaveBeenCalledTimes(1)

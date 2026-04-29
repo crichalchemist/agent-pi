@@ -9,7 +9,7 @@ import type { ActiveSession, ModelInfo, PiClient, SessionFactory } from './types
 import { getTier } from './types.js'
 
 type ModelRegistryLike = {
-  getAvailable: () => Promise<Array<{ provider: string; id: string }>>
+  getAvailable: () => Array<{ provider: string; id: string }> | PromiseLike<Array<{ provider: string; id: string }>>
 }
 
 // Production adapter: bridges Pi's AgentSession to our ActiveSession interface.

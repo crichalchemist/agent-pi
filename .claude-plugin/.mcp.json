@@ -2,7 +2,7 @@
   "mcpServers": {
     "pi": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/server.js"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/server/index.js"]
     }
   }
 }

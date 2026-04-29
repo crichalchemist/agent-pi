@@ -1,6 +1,6 @@
 [{
   "name": "pi-models",
-  "command": "node ${CLAUDE_PLUGIN_ROOT}/bin/list-models.js",
+  "command": "node ${CLAUDE_PLUGIN_ROOT}/bin/monitor/list-models.js",
   "description": "Available Pi models for this session",
   "when": "always"
 }]

@@ -1,0 +1,24 @@
+{
+  "name": "claude-pi",
+  "description": "Orchestrate Pi agents from Claude Code for cost-effective task delegation",
+  "owner": {
+    "name": "Courtney Andrew Richardson",
+    "email": "courtneyrichardson2027@u.northwestern.edu"
+  },
+  "plugins": [
+    {
+      "name": "claude-pi",
+      "description": "Delegate tasks from Claude Code to Pi agents using cost-appropriate models. Includes session-start model discovery, 7 MCP tools for agent orchestration, and a skill for delegation strategy.",
+      "version": "1.0.0",
+      "source": "./",
+      "license": "MIT",
+      "repository": "https://github.com/<owner>/claude-pi",
+      "keywords": ["pi", "agents", "orchestration", "delegation", "mcp"],
+      "author": {
+        "name": "Courtney Andrew Richardson",
+        "email": "courtneyrichardson2027@u.northwestern.edu"
+      },
+      "skills": ["./skills/"]
+    }
+  ]
+}

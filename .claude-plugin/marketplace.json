@@ -9,7 +9,7 @@
     {
       "name": "claude-pi",
       "description": "Delegate tasks from Claude Code to Pi agents using cost-appropriate models. Includes session-start model discovery, 7 MCP tools for agent orchestration, and a skill for delegation strategy.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "source": "./",
       "license": "MIT",
       "repository": "https://github.com/crichalchemist/agent-pi",

@@ -4,15 +4,15 @@
 set -euo pipefail
 
 SETTINGS_FILE="${SETTINGS_FILE:-${HOME}/.claude/settings.json}"
+WRAPPER="${HOME}/.claude/claude-pi/mcp-server.sh"
 STATUSLINE_CMD="${PLUGIN_ROOT}/scripts/statusline.sh"
-SERVER_SCRIPT="${PLUGIN_ROOT}/bin/server/index.js"
 
 [[ -f "$SETTINGS_FILE" ]] || exit 0
 
-python3 - "$SETTINGS_FILE" "$STATUSLINE_CMD" "$SERVER_SCRIPT" <<'PYEOF'
+python3 - "$SETTINGS_FILE" "$STATUSLINE_CMD" "$WRAPPER" <<'PYEOF'
 import json, sys
 
-settings_path, cmd, server_script = sys.argv[1], sys.argv[2], sys.argv[3]
+settings_path, cmd, wrapper = sys.argv[1], sys.argv[2], sys.argv[3]
 
 with open(settings_path) as f:
     settings = json.load(f)
@@ -26,7 +26,7 @@ else:
 
 mcp = settings.get('mcpServers', {})
 pi_entry = mcp.get('pi', {})
-if pi_entry.get('args', [None])[0] == server_script:
+if pi_entry.get('command') == wrapper:
     del mcp['pi']
     if not mcp:
         del settings['mcpServers']
@@ -38,3 +38,6 @@ with open(settings_path, 'w') as f:
     json.dump(settings, f, indent=2)
     f.write('\n')
 PYEOF
+
+# Remove the wrapper script if it still points to us
+[[ -f "$WRAPPER" ]] && rm "$WRAPPER" && echo '[claude-pi] Wrapper script removed.'

@@ -1,6 +1,14 @@
-import { describe, it, expect, vi } from 'vitest'
-import { makePiClient, makePiSessionAdapter } from '../../src/server/pi-client.js'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { makePiClient, makePiSessionAdapter, makePiSessionFactory } from '../../src/server/pi-client.js'
+import { createAgentSession } from '@mariozechner/pi-coding-agent'
 import type { ActiveSession, ModelInfo, SessionFactory } from '../../src/server/types.js'
+
+vi.mock('@mariozechner/pi-coding-agent', () => ({
+  createAgentSession: vi.fn(),
+  AuthStorage: class {},
+  ModelRegistry: class {},
+  SessionManager: class {},
+}))
 
 // Minimal mock of a Pi AgentSession
 const makeMockPiSession = () => {
@@ -174,4 +182,44 @@ describe('makePiSessionAdapter event buffering', () => {
     expect(onDelta).not.toHaveBeenCalled()
     expect(onEnd).not.toHaveBeenCalled()
   })
+})
+
+describe('makePiSessionFactory', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('returns the session without blocking on prompt()', async () => {
+    let resolvePrompt!: () => void
+    const promptDone = new Promise<void>(r => { resolvePrompt = r })
+
+    const piSession = {
+      prompt:    vi.fn(() => promptDone),
+      steer:     vi.fn(async () => {}),
+      abort:     vi.fn(async () => {}),
+      subscribe: vi.fn((_cb: (e: unknown) => void) => () => {}),
+    }
+
+    vi.mocked(createAgentSession).mockResolvedValue({ session: piSession } as any)
+
+    const factory = makePiSessionFactory({
+      authStorage:    {} as any,
+      modelRegistry:  { find: vi.fn().mockReturnValue({ provider: 'google', id: 'flash' }) } as any,
+      sessionManager: {} as any,
+    })
+
+    // Fixed: resolves immediately without waiting for prompt().
+    // Broken: hangs here because factory awaits promptDone, which never resolves.
+    const session = await factory('do the thing', 'google/flash', '/cwd')
+
+    expect(session).toBeDefined()
+    expect(piSession.prompt).toHaveBeenCalledWith('do the thing')
+
+    // Verify prompt is still in-flight (hasn't resolved)
+    let promptCompleted = false
+    promptDone.then(() => { promptCompleted = true })
+    await Promise.resolve()
+    expect(promptCompleted).toBe(false)
+
+    resolvePrompt()
+    await promptDone
+  }, 500)
 })

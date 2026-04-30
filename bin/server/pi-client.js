@@ -69,10 +69,11 @@ export const makePiSessionFactory = (deps) => async (task, modelKey, cwd) => {
         modelRegistry: deps.modelRegistry,
         sessionManager: deps.sessionManager,
     });
-    // Adapter subscribes to piSession immediately — buffers events until our
-    // caller's subscribe() arrives, preventing loss of fast completions.
+    // Adapter subscribes immediately and buffers events, so fire prompt as a
+    // background task — tools.ts gets the session handle while the agent runs,
+    // allowing store.add('running') to fire before the task completes.
     const adapted = makePiSessionAdapter(session);
-    await session.prompt(task);
+    session.prompt(task).catch(() => { });
     return adapted;
 };
 export const makePiClient = (factory, modelRegistry) => ({

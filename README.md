@@ -10,7 +10,7 @@ When Claude identifies a subtask that is independent, parallelizable, or better 
 
 At every session start, the plugin discovers your available Pi models and reports them before any user interaction. Claude uses those models throughout the session without any manual configuration.
 
-If you have the [superpowers](https://github.com/badlogic/superpowers) plugin installed, the plugin detects it and surfaces a dedicated skill for routing superpowers workflow roles — spec reviewers, code quality reviewers, parallel investigation agents — to the appropriate Pi model.
+If you have the [superpowers](https://github.com/obra/superpowers) plugin installed, the plugin detects it and surfaces a dedicated skill for routing superpowers workflow roles — spec reviewers, code quality reviewers, parallel investigation agents — to the appropriate Pi model.
 
 ## Prerequisites
 

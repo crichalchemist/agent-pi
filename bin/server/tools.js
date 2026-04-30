@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { makeSessionLogger } from './event-logger.js';
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 // Each tool input schema — used by index.ts for MCP registration
 export const TOOL_SCHEMAS = [
@@ -74,7 +75,7 @@ export const TOOL_SCHEMAS = [
         },
     },
 ];
-export const makeTools = (store, client) => {
+export const makeTools = (store, client, opts = {}) => {
     const tools = {
         pi_list_models: async (_args) => ({
             models: await client.listModels(),
@@ -110,6 +111,12 @@ export const makeTools = (store, client) => {
             const resolvedCwd = cwd ?? process.cwd();
             const session = await client.startSession(task, model, resolvedCwd);
             store.add(session_id, { session, output: '', status: 'running', createdAt: Date.now(), model });
+            const logger = makeSessionLogger({
+                sessionsDir: opts.sessionsDir,
+                sessionId: session_id,
+                task,
+                model,
+            });
             // Declared before subscribe so onEnd/onError callbacks can call unsubscribe()
             // without hitting a temporal dead zone (same pattern as pi_run_task).
             let unsubscribe = () => { };
@@ -117,11 +124,16 @@ export const makeTools = (store, client) => {
                 const e = store.get(session_id);
                 if (e)
                     store.update(session_id, { output: e.output + delta });
+                logger.delta(delta);
             }, () => {
+                const output = store.get(session_id)?.output ?? '';
                 store.update(session_id, { status: 'done' });
+                logger.end(output);
                 unsubscribe();
             }, (err) => {
+                const output = store.get(session_id)?.output ?? '';
                 store.update(session_id, { status: 'error', error: err });
+                logger.error(err, output);
                 unsubscribe();
             });
             return { session_id };

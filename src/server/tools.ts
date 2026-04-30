@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { PiClient, PiError, SessionStore } from './types.js'
+import { makeSessionLogger } from './event-logger.js'
 
 type RunTaskParams   = { task: string; model: string; cwd?: string; timeout?: number }
 type SpawnParams     = { task: string; model: string; cwd?: string }
@@ -83,7 +84,7 @@ export const TOOL_SCHEMAS = [
   },
 ] as const
 
-export const makeTools = (store: SessionStore, client: PiClient) => {
+export const makeTools = (store: SessionStore, client: PiClient, opts: { sessionsDir?: string } = {}) => {
   const tools = {
     pi_list_models: async (_args: Record<string, unknown>) => ({
       models: await client.listModels(),
@@ -130,6 +131,13 @@ export const makeTools = (store: SessionStore, client: PiClient) => {
 
       store.add(session_id, { session, output: '', status: 'running', createdAt: Date.now(), model })
 
+      const logger = makeSessionLogger({
+        sessionsDir: opts.sessionsDir,
+        sessionId: session_id,
+        task,
+        model,
+      })
+
       // Declared before subscribe so onEnd/onError callbacks can call unsubscribe()
       // without hitting a temporal dead zone (same pattern as pi_run_task).
       let unsubscribe: () => void = () => {}
@@ -137,13 +145,18 @@ export const makeTools = (store: SessionStore, client: PiClient) => {
         (delta) => {
           const e = store.get(session_id)
           if (e) store.update(session_id, { output: e.output + delta })
+          logger.delta(delta)
         },
         () => {
+          const output = store.get(session_id)?.output ?? ''
           store.update(session_id, { status: 'done' })
+          logger.end(output)
           unsubscribe()
         },
         (err) => {
+          const output = store.get(session_id)?.output ?? ''
           store.update(session_id, { status: 'error', error: err })
+          logger.error(err, output)
           unsubscribe()
         }
       )

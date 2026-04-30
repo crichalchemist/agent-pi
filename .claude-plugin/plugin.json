@@ -2,5 +2,9 @@
   "name": "claude-pi",
   "version": "1.2.2",
   "description": "Orchestrate Pi agents from Claude Code for cost-effective task delegation",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "install": "scripts/install.sh",
+    "uninstall": "scripts/uninstall.sh"
+  }
 }

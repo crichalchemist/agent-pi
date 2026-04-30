@@ -16,6 +16,7 @@ STATUSLINE_CMD="${PLUGIN_ROOT}/scripts/statusline.sh"
 mkdir -p "$WRAPPER_DIR"
 
 # Write the stable wrapper that resolves the current install at runtime.
+# Written once — survives all future version upgrades without changes.
 cat > "$WRAPPER" <<'WRAPPER_EOF'
 #!/usr/bin/env bash
 # Resolves the currently installed claude-pi binary at runtime.
@@ -34,14 +35,40 @@ exec node "$INSTALL_PATH/bin/server/index.js"
 WRAPPER_EOF
 chmod +x "$WRAPPER"
 
+# Write .mcp.json in the current working directory (where the user ran /plugin install).
+# Claude Code reads MCP server config from project-level .mcp.json, not settings.json.
+# The wrapper path is stable — this file never needs updating after version upgrades.
+MCP_JSON="${PWD}/.mcp.json"
+python3 - "$MCP_JSON" "$WRAPPER" <<'PYEOF'
+import json, sys, os
+
+mcp_path, wrapper = sys.argv[1], sys.argv[2]
+
+existing = {}
+if os.path.exists(mcp_path):
+    try:
+        with open(mcp_path) as f:
+            existing = json.load(f)
+    except Exception:
+        pass
+
+existing.setdefault('mcpServers', {})['pi'] = {'command': wrapper}
+
+with open(mcp_path, 'w') as f:
+    json.dump(existing, f, indent=2)
+    f.write('\n')
+
+print(f'[claude-pi] .mcp.json written: {mcp_path}')
+PYEOF
+
 if [[ ! -f "$SETTINGS_FILE" ]]; then
   echo '{}' > "$SETTINGS_FILE"
 fi
 
-python3 - "$SETTINGS_FILE" "$STATUSLINE_CMD" "$WRAPPER" <<'PYEOF'
+python3 - "$SETTINGS_FILE" "$STATUSLINE_CMD" <<'PYEOF'
 import json, sys
 
-settings_path, cmd, wrapper = sys.argv[1], sys.argv[2], sys.argv[3]
+settings_path, cmd = sys.argv[1], sys.argv[2]
 
 with open(settings_path) as f:
     settings = json.load(f)
@@ -51,14 +78,9 @@ settings['statusLine'] = {
     'command': cmd,
 }
 
-settings.setdefault('mcpServers', {})['pi'] = {
-    'command': wrapper,
-}
-
 with open(settings_path, 'w') as f:
     json.dump(settings, f, indent=2)
     f.write('\n')
 
 print(f'[claude-pi] Status line installed: {cmd}')
-print(f'[claude-pi] MCP server registered via wrapper: {wrapper}')
 PYEOF

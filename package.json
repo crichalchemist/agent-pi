@@ -1,6 +1,6 @@
 {
   "name": "@claude-plugins/pi",
-  "version": "1.2.2",
+  "version": "1.4.0",
   "description": "Orchestrate Pi agents from Claude Code for cost-effective task delegation",
   "license": "MIT",
   "type": "module",

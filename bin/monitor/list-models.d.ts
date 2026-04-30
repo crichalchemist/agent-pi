@@ -6,6 +6,7 @@ type ModelLike = {
 type RunOpts = {
     getAvailable?: () => ModelLike[] | Promise<ModelLike[]>;
     readSettings?: () => Promise<PiSettings>;
+    detectSuperpowers?: () => Promise<boolean>;
     output?: (line: string) => void;
     exit?: (code: number) => void;
 };

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { run } from '../../src/monitor/list-models.js'
 
 const noSettings = async () => ({})
+const noDetect = async (): Promise<boolean> => false
 
 describe('list-models monitor', () => {
   it('happy path: formats available models and exits 0', async () => {
@@ -12,7 +13,7 @@ describe('list-models monitor', () => {
     const output = vi.fn()
     const exit = vi.fn()
 
-    await run({ getAvailable, readSettings: noSettings, output, exit })
+    await run({ getAvailable, readSettings: noSettings, detectSuperpowers: noDetect, output, exit })
 
     expect(output).toHaveBeenCalledOnce()
     expect(output).toHaveBeenCalledWith(
@@ -160,11 +161,79 @@ describe('list-models monitor', () => {
     await run({
       getAvailable: () => [{ provider: 'google', id: 'gemini-2.5-pro' }],
       readSettings: async () => { throw new Error('disk error') },
+      detectSuperpowers: noDetect,
       output,
       exit,
     })
 
     expect(exit).toHaveBeenCalledWith(0)
     expect(output).toHaveBeenCalledOnce()
+  })
+
+  describe('superpowers detection', () => {
+    it('emits hint line when superpowers detected and models available', async () => {
+      const output = vi.fn()
+      const exit = vi.fn()
+
+      await run({
+        getAvailable: () => [{ provider: 'google', id: 'gemini-2.5-pro' }],
+        readSettings: noSettings,
+        detectSuperpowers: async () => true,
+        output,
+        exit,
+      })
+
+      expect(output).toHaveBeenCalledTimes(2)
+      expect(output.mock.calls[1][0]).toBe(
+        '[pi-models] superpowers detected — load claude-pi:superpowers skill for diverse agentic workflow integration'
+      )
+    })
+
+    it('no hint when superpowers not detected', async () => {
+      const output = vi.fn()
+      const exit = vi.fn()
+
+      await run({
+        getAvailable: () => [{ provider: 'google', id: 'gemini-2.5-pro' }],
+        readSettings: noSettings,
+        detectSuperpowers: async () => false,
+        output,
+        exit,
+      })
+
+      expect(output).toHaveBeenCalledTimes(1)
+    })
+
+    it('no hint when no models available even if superpowers detected', async () => {
+      const output = vi.fn()
+      const exit = vi.fn()
+
+      await run({
+        getAvailable: () => [],
+        readSettings: noSettings,
+        detectSuperpowers: async () => true,
+        output,
+        exit,
+      })
+
+      expect(output).toHaveBeenCalledTimes(1)
+      expect(output.mock.calls[0][0]).toContain('No models available')
+    })
+
+    it('gracefully ignores detection failure', async () => {
+      const output = vi.fn()
+      const exit = vi.fn()
+
+      await run({
+        getAvailable: () => [{ provider: 'google', id: 'gemini-2.5-pro' }],
+        readSettings: noSettings,
+        detectSuperpowers: async () => { throw new Error('fs error') },
+        output,
+        exit,
+      })
+
+      expect(exit).toHaveBeenCalledWith(0)
+      expect(output).toHaveBeenCalledTimes(1)
+    })
   })
 })

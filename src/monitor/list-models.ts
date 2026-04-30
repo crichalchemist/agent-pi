@@ -1,4 +1,7 @@
 import { fileURLToPath } from 'node:url'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { homedir } from 'node:os'
 import { AuthStorage, ModelRegistry } from '@mariozechner/pi-coding-agent'
 import { getTier } from '../server/types.js'
 import { readPiSettings, filterByEnabledModels, type PiSettings } from '../server/pi-settings.js'
@@ -8,15 +11,20 @@ type ModelLike = { provider: string; id: string }
 type RunOpts = {
   getAvailable?: () => ModelLike[] | Promise<ModelLike[]>
   readSettings?: () => Promise<PiSettings>
+  detectSuperpowers?: () => Promise<boolean>
   output?: (line: string) => void
   exit?: (code: number) => void
 }
 
 const LOG_PREFIX = '[pi-models]'
 const REFRESH_TOOL = 'pi_list_models'
+const SUPERPOWERS_SKILL = 'claude-pi:superpowers'
 
 const NO_MODELS_MSG =
   `${LOG_PREFIX} No models available — configure Pi auth with \`pi auth\` or set provider env vars`
+
+const SUPERPOWERS_HINT =
+  `${LOG_PREFIX} superpowers detected — load ${SUPERPOWERS_SKILL} skill for diverse agentic workflow integration`
 
 const formatLine = (models: ModelLike[], settings: PiSettings): string => {
   const parts = models.map(m => `${m.id} (${getTier(m.id)})`).join(', ')
@@ -32,10 +40,25 @@ const defaultGetAvailable = (): ModelLike[] => {
   return modelRegistry.getAvailable()
 }
 
+const defaultDetectSuperpowers = async (): Promise<boolean> => {
+  try {
+    const pluginsFile = join(homedir(), '.claude', 'plugins', 'installed_plugins.json')
+    const raw = await readFile(pluginsFile, 'utf-8')
+    const data = JSON.parse(raw) as { plugins?: Record<string, Array<{ installPath?: string }>> }
+    const entry = Object.entries(data.plugins ?? {}).find(([k]) => k.toLowerCase().includes('superpowers'))
+    if (!entry) return false
+    const installPath = entry[1].at(-1)?.installPath
+    if (!installPath) return false
+    await readFile(join(installPath, 'skills', 'subagent-driven-development', 'SKILL.md'), 'utf-8')
+    return true
+  } catch { return false }
+}
+
 export const run = async (opts: RunOpts = {}): Promise<void> => {
   const {
     getAvailable = defaultGetAvailable,
     readSettings = readPiSettings,
+    detectSuperpowers = defaultDetectSuperpowers,
     output = console.log,
     exit = process.exit,
   } = opts
@@ -50,6 +73,8 @@ export const run = async (opts: RunOpts = {}): Promise<void> => {
       output(NO_MODELS_MSG)
     } else {
       output(formatLine(models, settings))
+      const hasSuperPowers = await detectSuperpowers().catch(() => false)
+      if (hasSuperPowers) output(SUPERPOWERS_HINT)
     }
     exit(0)
   } catch (err) {

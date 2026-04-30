@@ -53,4 +53,23 @@ else:
     print(f'[claude-pi] Status line not set by this plugin, skipping.')
 PYEOF
 
+CLAUDE_MD="${HOME}/.claude/CLAUDE.md"
+if [[ -f "$CLAUDE_MD" ]]; then
+  python3 - "$CLAUDE_MD" <<'PYEOF'
+import sys, re
+
+claude_md = sys.argv[1]
+with open(claude_md) as f:
+    content = f.read()
+
+new_content = re.sub(r'\n# BEGIN claude-pi\n.*?# END claude-pi\n', '', content, flags=re.DOTALL)
+if new_content != content:
+    with open(claude_md, 'w') as f:
+        f.write(new_content)
+    print('[claude-pi] CLAUDE.md hint removed.')
+else:
+    print('[claude-pi] CLAUDE.md hint not present, skipping.')
+PYEOF
+fi
+
 [[ -f "$WRAPPER" ]] && rm "$WRAPPER" && echo '[claude-pi] Wrapper script removed.'

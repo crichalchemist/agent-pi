@@ -8,7 +8,8 @@
     "build": "tsc",
     "prepublishOnly": "tsc",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "version": "node -e \"const fs=require('fs');const v=require('./package.json').version;const p=JSON.parse(fs.readFileSync('.claude-plugin/plugin.json'));p.version=v;fs.writeFileSync('.claude-plugin/plugin.json',JSON.stringify(p,null,2)+'\\n');\" && git add .claude-plugin/plugin.json"
   },
   "dependencies": {
     "@mariozechner/pi-coding-agent": "^0.70.6",

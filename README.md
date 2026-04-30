@@ -1,12 +1,16 @@
 # claude-pi
 
-A Claude Code plugin that lets Claude delegate tasks to [Pi](https://pi.dev) agents. Claude orchestrates; Pi executes — using cost-appropriate models for mechanical, parallelizable, or model-diverse subtasks.
+A Claude Code plugin that turns [Pi](https://pi.dev) into a multi-agent orchestration layer. Run diverse agentic workflows by coordinating a fleet of AI models — Gemini, GPT-4, Claude Haiku, and others — in parallel, outside your context window.
 
 ## What it does
 
-When Claude identifies a task that is independent, repetitive, or better suited to a different model, it can hand that task to a Pi agent instead of handling it in the current session. This saves tokens for reasoning-heavy work and runs subtasks in parallel.
+Claude orchestrates. Pi executes.
 
-At every session start, the plugin discovers your available Pi models and reports them to Claude as a notification. Claude uses those models throughout the session without you having to configure anything.
+When Claude identifies a subtask that is independent, parallelizable, or better suited to a different model, it can delegate that work to a Pi agent and continue reasoning in the main session. Agents run concurrently across providers, each chosen for what it's best at — not just what's cheapest.
+
+At every session start, the plugin discovers your available Pi models and reports them before any user interaction. Claude uses those models throughout the session without any manual configuration.
+
+If you have the [superpowers](https://github.com/badlogic/superpowers) plugin installed, the plugin detects it and surfaces a dedicated skill for routing superpowers workflow roles — spec reviewers, code quality reviewers, parallel investigation agents — to the appropriate Pi model.
 
 ## Prerequisites
 
@@ -27,8 +31,6 @@ export GEMINI_API_KEY=AIza...
 export OPENAI_API_KEY=sk-...
 ```
 
-The plugin inherits whichever providers Pi has access to. Models without a valid key are excluded from the available list automatically.
-
 ## Installation
 
 ```bash
@@ -37,23 +39,25 @@ claude /plugin install github:crichalchemist/agent-pi
 
 No build step required — compiled files are included in the repository.
 
+The plugin patches `~/.claude/CLAUDE.md` to instruct Claude to lead with Pi for multi-agent workflows, and writes `.mcp.json` in the current project directory to register the MCP server.
+
 ## How it works
 
 ### Session-start model notification
 
-When you open a Claude Code session, the plugin runs a one-shot script that queries Pi for available models and delivers a notification before any user interaction:
+When a Claude Code session opens, the plugin runs a one-shot script that queries Pi for available models and delivers a notification before any user interaction:
 
 ```
-[pi-models] Available: gemini-2.5-pro (frontier), gemini-2.0-flash (fast), gpt-4o (balanced) — use pi_list_models to refresh
+[pi-models] Available: gemini-2.5-pro (frontier), gemini-2.0-flash (fast), gpt-4o (balanced) — default: google/gemini-2.5-pro — use pi_list_models to refresh
 ```
 
 Claude reads this notification and routes tasks to the appropriate tier.
 
 | Tier | Examples | Best for |
 |------|----------|---------|
-| fast | gemini-2.0-flash, claude-haiku-4-5, gpt-4o-mini | Formatting, boilerplate, mechanical transforms |
-| balanced | gpt-4o, claude-sonnet-4-6, o3-mini | Standard coding, analysis, research |
-| frontier | gemini-2.5-pro, claude-opus-4-7, o3 | Novel reasoning, architecture, state-of-the-art tasks |
+| fast | gemini-2.0-flash, claude-haiku-4-5, gpt-4o-mini | Formatting, boilerplate, retrieval, mechanical transforms |
+| balanced | gpt-4o, claude-sonnet-4-6, o3-mini | Standard coding, analysis, review, research |
+| frontier | gemini-2.5-pro, claude-opus-4-7, o3 | Novel reasoning, architecture, security review, state-of-the-art tasks |
 
 ### MCP tools
 
@@ -69,25 +73,41 @@ The plugin registers seven tools on the `pi` MCP server:
 | `pi_get_result` | Wait for a spawned agent to finish and return output |
 | `pi_terminate_agent` | Abort a running agent |
 
-### Orchestration skill
+### Parallel orchestration pattern
 
-The plugin includes a skill at `skills/orchestrate/SKILL.md` that guides Claude on when to delegate, which model tier to choose, and the parallel-spawn pattern:
+The primary pattern for multi-agent work:
 
 ```
 pi_spawn_agent × N  →  pi_poll_agent loop  →  pi_get_result × N  →  synthesize
 ```
 
-Invoke it directly with `/claude-pi:orchestrate`, or Claude will activate it automatically when a task matches the delegation criteria.
+Spawn N agents with independent, self-contained prompts. Poll for progress and steer if needed. Collect results and synthesize in the main session.
+
+### Skills
+
+The plugin ships two skills:
+
+**`skills/orchestrate/SKILL.md`** — guides Claude on when to delegate, which model tier to choose, and how to use the parallel-spawn pattern. Invoke with `/claude-pi:orchestrate`.
+
+**`skills/superpowers/SKILL.md`** — routes superpowers workflow roles to Pi. Spec compliance reviewers, code quality reviewers, and parallel investigation agents are read-only and context-independent — ideal for Pi. Implementer subagents that need `Edit`/`Bash` stay on the `Agent` tool. Invoke with `/claude-pi:superpowers`.
+
+## Status line
+
+The plugin adds a live status line to Claude Code showing running and recently completed Pi agents:
+
+```
+● 2 running  ✓ 3 done
+```
 
 ## Development
 
 ```bash
 npm install
-npm test          # 31 unit tests
+npm test          # 80 unit tests
 npm run build     # compile src/ → bin/
 ```
 
-Tests use [vitest](https://vitest.dev). The Pi SDK is never called in unit tests — all SDK dependencies are injectable.
+Tests use [vitest](https://vitest.dev). The Pi SDK is never imported in tests — all external dependencies are injectable.
 
 ## License
 

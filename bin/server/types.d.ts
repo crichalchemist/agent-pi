@@ -49,5 +49,4 @@ export type PiError = {
     kind: 'session_not_found';
     session_id: string;
 };
-export declare const MODEL_TIERS: Record<string, ModelTier>;
 export declare const getTier: (modelId: string) => ModelTier;

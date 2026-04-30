@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import type { SessionStore } from './types.js'
@@ -24,6 +24,9 @@ export const makeStatusWriter = (opts: {
   const dir = opts.statusDir ?? DEFAULT_STATUS_DIR
   const { store } = opts
 
+  // Each call gets a unique tmp path so concurrent writes don't collide.
+  let seq = 0
+
   return async () => {
     const entries = [...store.all().values()]
 
@@ -42,6 +45,9 @@ export const makeStatusWriter = (opts: {
     }
 
     await mkdir(dir, { recursive: true })
-    await writeFile(join(dir, 'status.json'), JSON.stringify(data))
+    const statusPath = join(dir, 'status.json')
+    const tmpPath = join(dir, `.status.${seq++}.tmp`)
+    await writeFile(tmpPath, JSON.stringify(data))
+    await rename(tmpPath, statusPath)
   }
 }

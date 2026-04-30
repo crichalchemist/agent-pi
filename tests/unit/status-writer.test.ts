@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mkdtemp, readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { makeSessionStore } from '../../src/server/session-store.js'
@@ -114,6 +114,28 @@ describe('makeStatusWriter', () => {
 
     const data = JSON.parse(await readFile(join(tmpDir, 'status.json'), 'utf8'))
     expect(data.models).toEqual(['claude-sonnet-4-6'])
+    store.dispose()
+  })
+
+  it('concurrent writes each produce valid JSON (atomic write)', async () => {
+    const store = makeSessionStore()
+    const write = makeStatusWriter({ statusDir: tmpDir, store })
+
+    await Promise.all([write(), write(), write()])
+
+    const raw = await readFile(join(tmpDir, 'status.json'), 'utf8')
+    expect(() => JSON.parse(raw)).not.toThrow()
+    store.dispose()
+  })
+
+  it('leaves no .tmp files after a successful write', async () => {
+    const store = makeSessionStore()
+    const write = makeStatusWriter({ statusDir: tmpDir, store })
+
+    await write()
+
+    const files = await readdir(tmpDir)
+    expect(files.filter(f => f.endsWith('.tmp'))).toHaveLength(0)
     store.dispose()
   })
 

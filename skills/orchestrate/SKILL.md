@@ -69,6 +69,8 @@ Do NOT delegate when:
 4. synthesize          → combine results in this session
 ```
 
+**Cap parallel spawns at 6.** Beyond that, provider rate limits and context overhead from tracking session IDs and partial outputs outweigh the parallelism gains. For larger batches, spawn in waves of 6, collect results, then spawn the next wave.
+
 Use `pi_run_task` only for single-task, time-bounded work where you need the result before continuing.
 
 ## Steering Rule

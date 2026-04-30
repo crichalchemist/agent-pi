@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { run } from '../../src/monitor/list-models.js'
 
+const noSettings = async () => ({})
+
 describe('list-models monitor', () => {
   it('happy path: formats available models and exits 0', async () => {
     const getAvailable = vi.fn(() => [
@@ -10,7 +12,7 @@ describe('list-models monitor', () => {
     const output = vi.fn()
     const exit = vi.fn()
 
-    await run({ getAvailable, output, exit })
+    await run({ getAvailable, readSettings: noSettings, output, exit })
 
     expect(output).toHaveBeenCalledOnce()
     expect(output).toHaveBeenCalledWith(
@@ -24,7 +26,7 @@ describe('list-models monitor', () => {
     const output = vi.fn()
     const exit = vi.fn()
 
-    await run({ getAvailable, output, exit })
+    await run({ getAvailable, readSettings: noSettings, output, exit })
 
     expect(output).toHaveBeenCalledOnce()
     expect(output).toHaveBeenCalledWith(
@@ -38,7 +40,7 @@ describe('list-models monitor', () => {
     const output = vi.fn()
     const exit = vi.fn()
 
-    await run({ getAvailable, output, exit })
+    await run({ getAvailable, readSettings: noSettings, output, exit })
 
     expect(output).not.toHaveBeenCalled()
     expect(exit).toHaveBeenCalledWith(1)
@@ -49,7 +51,7 @@ describe('list-models monitor', () => {
     const output = vi.fn()
     const exit = vi.fn()
 
-    await run({ getAvailable, output, exit })
+    await run({ getAvailable, readSettings: noSettings, output, exit })
 
     expect(output).not.toHaveBeenCalled()
     expect(exit).toHaveBeenCalledWith(1)
@@ -65,6 +67,7 @@ describe('list-models monitor', () => {
         { provider: 'google', id: 'gemini-2.0-flash' },
         { provider: 'acme', id: 'totally-unknown-model' },
       ],
+      readSettings: noSettings,
       output,
       exit,
     })
@@ -81,6 +84,7 @@ describe('list-models monitor', () => {
 
     await run({
       getAvailable: () => [{ provider: 'google', id: 'gemini-2.5-pro' }],
+      readSettings: noSettings,
       output,
       exit,
     })
@@ -88,5 +92,79 @@ describe('list-models monitor', () => {
     const line: string = output.mock.calls[0][0]
     expect(line.startsWith('[pi-models] Available:')).toBe(true)
     expect(line.endsWith('— use pi_list_models to refresh')).toBe(true)
+  })
+
+  it('filters to enabledModels from Pi settings', async () => {
+    const output = vi.fn()
+    const exit = vi.fn()
+
+    await run({
+      getAvailable: () => [
+        { provider: 'google', id: 'gemini-2.5-pro' },
+        { provider: 'openai', id: 'gpt-4o' },
+        { provider: 'acme', id: 'excluded-model' },
+      ],
+      readSettings: async () => ({
+        enabledModels: ['google/gemini-2.5-pro', 'openai/gpt-4o'],
+      }),
+      output,
+      exit,
+    })
+
+    const line: string = output.mock.calls[0][0]
+    expect(line).toContain('gemini-2.5-pro')
+    expect(line).toContain('gpt-4o')
+    expect(line).not.toContain('excluded-model')
+  })
+
+  it('shows default model when Pi settings have defaultProvider + defaultModel', async () => {
+    const output = vi.fn()
+    const exit = vi.fn()
+
+    await run({
+      getAvailable: () => [
+        { provider: 'opencode-go', id: 'glm-5.1' },
+        { provider: 'google', id: 'gemini-2.5-pro' },
+      ],
+      readSettings: async () => ({
+        defaultProvider: 'opencode-go',
+        defaultModel: 'glm-5.1',
+      }),
+      output,
+      exit,
+    })
+
+    const line: string = output.mock.calls[0][0]
+    expect(line).toContain('default: opencode-go/glm-5.1')
+  })
+
+  it('omits default hint when no default is configured', async () => {
+    const output = vi.fn()
+    const exit = vi.fn()
+
+    await run({
+      getAvailable: () => [{ provider: 'google', id: 'gemini-2.5-pro' }],
+      readSettings: noSettings,
+      output,
+      exit,
+    })
+
+    const line: string = output.mock.calls[0][0]
+    expect(line).not.toContain('default:')
+  })
+
+  it('gracefully ignores a readSettings failure', async () => {
+    const output = vi.fn()
+    const exit = vi.fn()
+
+    await run({
+      getAvailable: () => [{ provider: 'google', id: 'gemini-2.5-pro' }],
+      readSettings: async () => { throw new Error('disk error') },
+      output,
+      exit,
+    })
+
+    expect(exit).toHaveBeenCalledWith(0)
+    expect(output).toHaveBeenCalledOnce()
   })
 })

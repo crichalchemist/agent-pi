@@ -1,0 +1,10 @@
+export type PiSettings = {
+    enabledModels?: string[];
+    defaultModel?: string;
+    defaultProvider?: string;
+};
+export declare const readPiSettings: (path?: string) => Promise<PiSettings>;
+export declare const filterByEnabledModels: <T extends {
+    provider: string;
+    id: string;
+}>(models: T[], settings: PiSettings) => T[];

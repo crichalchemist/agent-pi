@@ -1,5 +1,6 @@
 import { createAgentSession, } from '@mariozechner/pi-coding-agent';
 import { getTier } from './types.js';
+import { readPiSettings, filterByEnabledModels } from './pi-settings.js';
 // Exported for unit testing — adapts any PiSession-like object to ActiveSession.
 // Subscribes immediately on construction to buffer events, then drains the buffer
 // when the caller's subscribe() arrives (prevents race with fast completions).
@@ -76,11 +77,15 @@ export const makePiSessionFactory = (deps) => async (task, modelKey, cwd) => {
     session.prompt(task).catch(() => { });
     return adapted;
 };
-export const makePiClient = (factory, modelRegistry) => ({
+export const makePiClient = (factory, modelRegistry, opts = {}) => ({
     startSession: (task, modelKey, cwd) => factory(task, modelKey, cwd),
     listModels: async () => {
-        const models = await modelRegistry.getAvailable();
-        return models.map((m) => ({
+        const getSettings = opts.readSettings ?? readPiSettings;
+        const [models, settings] = await Promise.all([
+            modelRegistry.getAvailable(),
+            getSettings().catch(() => ({})),
+        ]);
+        return filterByEnabledModels(models, settings).map((m) => ({
             key: `${m.provider}/${m.id}`,
             provider: m.provider,
             id: m.id,

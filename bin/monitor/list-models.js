@@ -1,12 +1,16 @@
 import { fileURLToPath } from 'node:url';
 import { AuthStorage, ModelRegistry } from '@mariozechner/pi-coding-agent';
 import { getTier } from '../server/types.js';
+import { readPiSettings, filterByEnabledModels } from '../server/pi-settings.js';
 const LOG_PREFIX = '[pi-models]';
 const REFRESH_TOOL = 'pi_list_models';
 const NO_MODELS_MSG = `${LOG_PREFIX} No models available — configure Pi auth with \`pi auth\` or set provider env vars`;
-const formatLine = (models) => {
+const formatLine = (models, settings) => {
     const parts = models.map(m => `${m.id} (${getTier(m.id)})`).join(', ');
-    return `${LOG_PREFIX} Available: ${parts} — use ${REFRESH_TOOL} to refresh`;
+    const defaultKey = settings.defaultProvider && settings.defaultModel
+        ? ` — default: ${settings.defaultProvider}/${settings.defaultModel}`
+        : '';
+    return `${LOG_PREFIX} Available: ${parts}${defaultKey} — use ${REFRESH_TOOL} to refresh`;
 };
 const defaultGetAvailable = () => {
     const authStorage = AuthStorage.create();
@@ -14,14 +18,18 @@ const defaultGetAvailable = () => {
     return modelRegistry.getAvailable();
 };
 export const run = async (opts = {}) => {
-    const { getAvailable = defaultGetAvailable, output = console.log, exit = process.exit, } = opts;
+    const { getAvailable = defaultGetAvailable, readSettings = readPiSettings, output = console.log, exit = process.exit, } = opts;
     try {
-        const models = await getAvailable();
+        const [rawModels, settings] = await Promise.all([
+            Promise.resolve(getAvailable()),
+            readSettings().catch(() => ({})),
+        ]);
+        const models = filterByEnabledModels(rawModels, settings);
         if (models.length === 0) {
             output(NO_MODELS_MSG);
         }
         else {
-            output(formatLine(models));
+            output(formatLine(models, settings));
         }
         exit(0);
     }

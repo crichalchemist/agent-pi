@@ -119,7 +119,9 @@ export declare const TOOL_SCHEMAS: readonly [{
         readonly required: readonly ["session_id"];
     };
 }];
-export declare const makeTools: (store: SessionStore, client: PiClient) => {
+export declare const makeTools: (store: SessionStore, client: PiClient, opts?: {
+    sessionsDir?: string;
+}) => {
     tools: {
         pi_list_models: (_args: Record<string, unknown>) => Promise<{
             models: import("./types.js").ModelInfo[];

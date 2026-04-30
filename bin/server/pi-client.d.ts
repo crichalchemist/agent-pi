@@ -1,5 +1,6 @@
 import { AuthStorage, ModelRegistry, SessionManager } from '@mariozechner/pi-coding-agent';
 import type { ActiveSession, PiClient, SessionFactory } from './types.js';
+import { type PiSettings } from './pi-settings.js';
 type ModelRegistryLike = {
     getAvailable: () => Array<{
         provider: string;
@@ -20,5 +21,7 @@ export declare const makePiSessionFactory: (deps: {
     modelRegistry: ModelRegistry;
     sessionManager: SessionManager;
 }) => SessionFactory;
-export declare const makePiClient: (factory: SessionFactory, modelRegistry: ModelRegistryLike) => PiClient;
+export declare const makePiClient: (factory: SessionFactory, modelRegistry: ModelRegistryLike, opts?: {
+    readSettings?: () => Promise<PiSettings>;
+}) => PiClient;
 export {};

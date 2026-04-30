@@ -7,6 +7,7 @@ import {
 } from '@mariozechner/pi-coding-agent'
 import type { ActiveSession, ModelInfo, PiClient, SessionFactory } from './types.js'
 import { getTier } from './types.js'
+import { readPiSettings, filterByEnabledModels, type PiSettings } from './pi-settings.js'
 
 type ModelRegistryLike = {
   getAvailable: () => Array<{ provider: string; id: string }> | PromiseLike<Array<{ provider: string; id: string }>>
@@ -93,12 +94,17 @@ export const makePiSessionFactory = (deps: {
 
 export const makePiClient = (
   factory: SessionFactory,
-  modelRegistry: ModelRegistryLike
+  modelRegistry: ModelRegistryLike,
+  opts: { readSettings?: () => Promise<PiSettings> } = {}
 ): PiClient => ({
   startSession: (task, modelKey, cwd) => factory(task, modelKey, cwd),
   listModels: async () => {
-    const models = await modelRegistry.getAvailable()
-    return models.map((m): ModelInfo => ({
+    const getSettings = opts.readSettings ?? readPiSettings
+    const [models, settings] = await Promise.all([
+      modelRegistry.getAvailable(),
+      getSettings().catch(() => ({} as PiSettings)),
+    ])
+    return filterByEnabledModels(models, settings).map((m): ModelInfo => ({
       key:      `${m.provider}/${m.id}`,
       provider: m.provider,
       id:       m.id,

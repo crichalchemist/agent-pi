@@ -66,7 +66,7 @@ describe('makePiClient', () => {
   })
 
   it('listModels returns ModelInfo with key, provider, id, tier', async () => {
-    const client = makePiClient(vi.fn(), mockModelRegistry)
+    const client = makePiClient(vi.fn(), mockModelRegistry, { readSettings: async () => ({}) })
     const models = await client.listModels()
 
     expect(models).toEqual([
@@ -80,9 +80,34 @@ describe('makePiClient', () => {
     const registry = {
       getAvailable: vi.fn(async () => [{ provider: 'acme', id: 'unknown-model-x' }]),
     }
-    const client = makePiClient(vi.fn(), registry)
+    const client = makePiClient(vi.fn(), registry, { readSettings: async () => ({}) })
     const models = await client.listModels()
     expect(models[0].tier).toBe('balanced')
+  })
+
+  it('listModels filters to enabledModels when Pi settings are present', async () => {
+    const readSettings = vi.fn(async () => ({
+      enabledModels: ['google/gemini-2.5-pro', 'openai/gpt-4o'],
+    }))
+    const client = makePiClient(vi.fn(), mockModelRegistry, { readSettings })
+    const models = await client.listModels()
+
+    expect(models).toHaveLength(2)
+    expect(models.map(m => m.key)).toEqual(['google/gemini-2.5-pro', 'openai/gpt-4o'])
+  })
+
+  it('listModels returns all models when enabledModels is absent in settings', async () => {
+    const readSettings = vi.fn(async () => ({}))
+    const client = makePiClient(vi.fn(), mockModelRegistry, { readSettings })
+    const models = await client.listModels()
+    expect(models).toHaveLength(3)
+  })
+
+  it('listModels returns all models when readSettings throws', async () => {
+    const readSettings = vi.fn(async () => { throw new Error('read failed') })
+    const client = makePiClient(vi.fn(), mockModelRegistry, { readSettings })
+    const models = await client.listModels()
+    expect(models).toHaveLength(3)
   })
 })
 

@@ -21,7 +21,7 @@ This is a Claude Code plugin (`claude-pi`) that exposes a Pi agent orchestration
 
 **`src/server/index.ts`** — the MCP stdio server, started by Claude Code via `~/.claude/settings.json` → `mcpServers.pi`. Registers seven tools (`pi_list_models`, `pi_run_task`, `pi_spawn_agent`, `pi_steer_agent`, `pi_poll_agent`, `pi_get_result`, `pi_terminate_agent`).
 
-**`src/monitor/list-models.ts`** — a one-shot script run at session start via `monitors/monitors.json`. Queries Pi for available models and emits a `[pi-models]` notification to the conversation before any user interaction.
+**`src/monitor/list-models.ts`** — a one-shot script run at session start via `monitors/monitors.json`. Queries Pi for available models and emits a `[pi-models]` notification to the conversation before any user interaction. If the [superpowers](https://github.com/obra/superpowers) plugin is detected on disk, emits a second hint line pointing to `claude-pi:superpowers`.
 
 ### Data flow through the server
 
@@ -59,11 +59,22 @@ The monitor notification includes `— default: provider/model` when `defaultPro
 
 ### Plugin wiring
 
-`plugin.json` → `scripts/install.sh` and `scripts/uninstall.sh` manage two entries in `~/.claude/settings.json`:
-- `statusLine.command` — path to `scripts/statusline.sh`
-- `mcpServers.pi` — absolute path to `bin/server/index.js` in the plugin cache
+`plugin.json` → `.claude-plugin/scripts/install.sh` and `uninstall.sh` manage:
+- `~/.claude/settings.json` → `statusLine.command` — path to `scripts/statusline.sh`
+- `${PWD}/.mcp.json` → `mcpServers.pi` — points to a stable wrapper at `~/.claude/claude-pi/mcp-server.sh` that resolves the current install path at runtime (survives version upgrades)
+- `~/.claude/CLAUDE.md` — appends a sentinel-guarded block instructing Claude to lead with Pi for multi-agent workflows; removed cleanly on uninstall
 
 `monitors/monitors.json` runs `bin/monitor/list-models.js` at session start using `${CLAUDE_PLUGIN_ROOT}`.
+
+### Skills
+
+`skills/orchestrate/SKILL.md` — guides Claude on when to delegate, model tier selection, the parallel-spawn pattern, and the 6-agent parallel cap. Invoked as `claude-pi:orchestrate`.
+
+`skills/superpowers/SKILL.md` — routes [superpowers](https://github.com/obra/superpowers) workflow roles to Pi. Read-only roles (spec reviewer, code quality reviewer, parallel investigation agents) go to Pi; implementer subagents that need `Edit`/`Bash` stay on the `Agent` tool. Invoked as `claude-pi:superpowers`. Only surfaced when superpowers is detected at session start.
+
+### Version sync
+
+`npm version <patch|minor|major>` bumps `package.json` and automatically syncs `.claude-plugin/plugin.json` via the `version` lifecycle hook, staging both files into the same git commit.
 
 ### Dependency injection pattern
 

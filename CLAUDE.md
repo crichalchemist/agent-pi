@@ -19,7 +19,7 @@ npx vitest run tests/unit/tools.test.ts
 
 This is a Claude Code plugin (`claude-pi`) that exposes a Pi agent orchestration layer as an MCP server. There are two runtime entry points:
 
-**`src/server/index.ts`** — the MCP stdio server, started by Claude Code via `~/.claude/settings.json` → `mcpServers.pi`. Registers seven tools (`pi_list_models`, `pi_run_task`, `pi_spawn_agent`, `pi_steer_agent`, `pi_poll_agent`, `pi_get_result`, `pi_terminate_agent`).
+**`src/server/index.ts`** — the MCP stdio server, started by Claude Code via `~/.claude/settings.json` → `mcpServers.pi`. Registers eight tools (`pi_list_models`, `pi_run_task`, `pi_spawn_agent`, `pi_steer_agent`, `pi_followup_agent`, `pi_poll_agent`, `pi_get_result`, `pi_terminate_agent`).
 
 **`src/monitor/list-models.ts`** — a one-shot script run at session start via `monitors/monitors.json`. Queries Pi for available models and emits a `[pi-models]` notification to the conversation before any user interaction. If the [superpowers](https://github.com/obra/superpowers) plugin is detected on disk, emits a second hint line pointing to `claude-pi:superpowers`.
 

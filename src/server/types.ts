@@ -12,6 +12,7 @@ export type ModelInfo = {
 // Our abstraction over Pi's AgentSession — the only shape the rest of the codebase sees
 export type ActiveSession = {
   steer: (text: string) => Promise<void>
+  followUp: (text: string) => Promise<void>
   abort: () => Promise<void>
   // Returns an unsubscribe function
   subscribe: (
@@ -43,11 +44,12 @@ export type SessionStore = {
 export type SessionFactory = (
   task: string,
   modelKey: string,
-  cwd: string
+  cwd: string,
+  followUp?: boolean
 ) => Promise<ActiveSession>
 
 export type PiClient = {
-  startSession: (task: string, modelKey: string, cwd: string) => Promise<ActiveSession>
+  startSession: (task: string, modelKey: string, cwd: string, followUp?: boolean) => Promise<ActiveSession>
   listModels: () => Promise<ModelInfo[]>
 }
 

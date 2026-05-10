@@ -55,10 +55,18 @@ Do NOT delegate when:
 | `pi_list_models` | Refresh available models |
 | `pi_run_task` | Run task and wait for result (blocking) |
 | `pi_spawn_agent` | Spawn agent, returns session_id immediately |
-| `pi_steer_agent` | Send mid-task steering message |
+| `pi_steer_agent` | Send mid-task steering message (delivered after current turn) |
+| `pi_followup_agent` | Queue non-interruptive message (delivered after agent finishes) |
 | `pi_poll_agent` | Check status and partial output |
 | `pi_get_result` | Wait for spawned agent to finish |
 | `pi_terminate_agent` | Abort a running agent |
+
+## Message Delivery
+
+- **`steer`**: Interrupt-style. Sent to running agent, delivered after the current assistant turn finishes its tool calls. Use for corrections, pivots, or priority changes mid-task.
+- **`followUp`**: Non-interruptive. Queued until the agent finishes all work. Use when you do not want to disturb the agent at all.
+
+When using `pi_run_task` or `pi_spawn_agent`, pass `followUp: true` to queue the task as a follow-up rather than an immediate prompt.
 
 ## Parallel Pattern (primary)
 

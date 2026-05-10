@@ -4,7 +4,7 @@ import { readPiSettings, filterByEnabledModels } from './pi-settings.js';
 // Exported for unit testing — adapts any PiSession-like object to ActiveSession.
 // Subscribes immediately on construction to buffer events, then drains the buffer
 // when the caller's subscribe() arrives (prevents race with fast completions).
-export const makePiSessionAdapter = (piSession) => {
+export const makePiSessionAdapter = (piSession, opts = {}) => {
     const buffered = [];
     let forward = null;
     piSession.subscribe((event) => {
@@ -17,6 +17,7 @@ export const makePiSessionAdapter = (piSession) => {
     });
     return {
         steer: (text) => piSession.steer(text),
+        followUp: (text) => (piSession.followUp ?? piSession.steer)(text),
         abort: () => piSession.abort(),
         subscribe: (onDelta, onEnd, onError) => {
             // Tracks error from message_end so agent_end can route to onError instead of onEnd.
@@ -57,7 +58,7 @@ export const makePiSessionAdapter = (piSession) => {
 };
 // Production session factory. Requires Pi auth to be configured via `pi auth` or
 // provider env vars (ANTHROPIC_API_KEY, GEMINI_API_KEY, etc.) before calling.
-export const makePiSessionFactory = (deps) => async (task, modelKey, cwd) => {
+export const makePiSessionFactory = (deps) => async (task, modelKey, cwd, followUp) => {
     const [provider, ...idParts] = modelKey.split('/');
     const id = idParts.join('/');
     const model = deps.modelRegistry.find(provider, id);
@@ -74,11 +75,16 @@ export const makePiSessionFactory = (deps) => async (task, modelKey, cwd) => {
     // background task — tools.ts gets the session handle while the agent runs,
     // allowing store.add('running') to fire before the task completes.
     const adapted = makePiSessionAdapter(session);
-    session.prompt(task).catch(() => { });
+    if (followUp) {
+        session.followUp(task).catch(() => { });
+    }
+    else {
+        session.prompt(task).catch(() => { });
+    }
     return adapted;
 };
 export const makePiClient = (factory, modelRegistry, opts = {}) => ({
-    startSession: (task, modelKey, cwd) => factory(task, modelKey, cwd),
+    startSession: (task, modelKey, cwd, followUp) => factory(task, modelKey, cwd, followUp),
     listModels: async () => {
         const getSettings = opts.readSettings ?? readPiSettings;
         const [models, settings] = await Promise.all([

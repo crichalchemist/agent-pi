@@ -12,10 +12,13 @@ type ModelRegistryLike = {
 };
 type PiSessionLike = {
     steer: (text: string) => Promise<void>;
+    followUp?: (text: string) => Promise<void>;
     abort: () => Promise<void>;
     subscribe: (listener: (event: unknown) => void) => () => void;
 };
-export declare const makePiSessionAdapter: (piSession: PiSessionLike) => ActiveSession;
+export declare const makePiSessionAdapter: (piSession: PiSessionLike, opts?: {
+    followUp?: boolean;
+}) => ActiveSession;
 export declare const makePiSessionFactory: (deps: {
     authStorage: AuthStorage;
     modelRegistry: ModelRegistry;

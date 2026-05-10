@@ -39,6 +39,8 @@ Per task:
 
 Use `pi_run_task` for sequential reviews. For the final cross-task review, spawn once and `pi_get_result`.
 
+Use `followUp: true` on `pi_spawn_agent` when you want to queue a review without interrupting the implementer.
+
 ### dispatching-parallel-agents / systematic-debugging
 
 Independent investigations are Pi's strongest use case — each agent gets a self-contained prompt.

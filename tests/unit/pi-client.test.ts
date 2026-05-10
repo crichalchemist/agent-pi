@@ -53,7 +53,7 @@ describe('makePiClient', () => {
 
     await client.startSession('do the thing', 'google/gemini-2.0-flash', '/tmp')
 
-    expect(factory).toHaveBeenCalledWith('do the thing', 'google/gemini-2.0-flash', '/tmp')
+    expect(factory).toHaveBeenCalledWith('do the thing', 'google/gemini-2.0-flash', '/tmp', undefined)
   })
 
   it('startSession returns the ActiveSession from the factory', async () => {
@@ -212,12 +212,57 @@ describe('makePiSessionAdapter event buffering', () => {
 describe('makePiSessionFactory', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
+  it('calls followUp (not prompt) when followUp=true', async () => {
+    const piSession = {
+      prompt:    vi.fn(),
+      followUp:  vi.fn(() => Promise.resolve()),
+      steer:     vi.fn(async () => {}),
+      abort:     vi.fn(async () => {}),
+      subscribe: vi.fn(() => () => {}),
+    }
+    vi.mocked(createAgentSession).mockResolvedValue({ session: piSession } as any)
+
+    const factory = makePiSessionFactory({
+      authStorage:    {} as any,
+      modelRegistry:  { find: vi.fn().mockReturnValue({ provider: 'google', id: 'flash' }) } as any,
+      sessionManager: {} as any,
+    })
+
+    await factory('task', 'google/flash', '/cwd', true)
+
+    expect(piSession.followUp).toHaveBeenCalledWith('task')
+    expect(piSession.prompt).not.toHaveBeenCalled()
+  })
+
+  it('calls prompt (not followUp) when followUp=undefined', async () => {
+    const piSession = {
+      prompt:    vi.fn(() => Promise.resolve()),
+      followUp:  vi.fn(),
+      steer:     vi.fn(async () => {}),
+      abort:     vi.fn(async () => {}),
+      subscribe: vi.fn(() => () => {}),
+    }
+    vi.mocked(createAgentSession).mockResolvedValue({ session: piSession } as any)
+
+    const factory = makePiSessionFactory({
+      authStorage:    {} as any,
+      modelRegistry:  { find: vi.fn().mockReturnValue({ provider: 'google', id: 'flash' }) } as any,
+      sessionManager: {} as any,
+    })
+
+    await factory('task', 'google/flash', '/cwd', undefined)
+
+    expect(piSession.prompt).toHaveBeenCalledWith('task')
+    expect(piSession.followUp).not.toHaveBeenCalled()
+  })
+
   it('returns the session without blocking on prompt()', async () => {
     let resolvePrompt!: () => void
     const promptDone = new Promise<void>(r => { resolvePrompt = r })
 
     const piSession = {
       prompt:    vi.fn(() => promptDone),
+      followUp:  vi.fn(() => promptDone),
       steer:     vi.fn(async () => {}),
       abort:     vi.fn(async () => {}),
       subscribe: vi.fn((_cb: (e: unknown) => void) => () => {}),
@@ -233,7 +278,7 @@ describe('makePiSessionFactory', () => {
 
     // Fixed: resolves immediately without waiting for prompt().
     // Broken: hangs here because factory awaits promptDone, which never resolves.
-    const session = await factory('do the thing', 'google/flash', '/cwd')
+    const session = await factory('do the thing', 'google/flash', '/cwd', undefined)
 
     expect(session).toBeDefined()
     expect(piSession.prompt).toHaveBeenCalledWith('do the thing')

@@ -68,7 +68,8 @@ The plugin registers seven tools on the `pi` MCP server:
 | `pi_list_models` | Refresh available models mid-session |
 | `pi_run_task` | Run a task and wait for the result (blocking) |
 | `pi_spawn_agent` | Spawn an agent and return a session ID immediately |
-| `pi_steer_agent` | Send a steering message to a running agent |
+| `pi_steer_agent` | Send a mid-task steering message (delivered after current turn finishes) |
+| `pi_followup_agent` | Queue a non-interruptive message (delivered only after agent finishes all work) |
 | `pi_poll_agent` | Check status and partial output of a spawned agent |
 | `pi_get_result` | Wait for a spawned agent to finish and return output |
 | `pi_terminate_agent` | Abort a running agent |

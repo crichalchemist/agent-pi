@@ -15,6 +15,7 @@ type ModelRegistryLike = {
 
 type PiSessionLike = {
   steer:     (text: string) => Promise<void>
+  followUp?: (text: string) => Promise<void>
   abort:     () => Promise<void>
   subscribe: (listener: (event: unknown) => void) => () => void
 }
@@ -22,7 +23,7 @@ type PiSessionLike = {
 // Exported for unit testing — adapts any PiSession-like object to ActiveSession.
 // Subscribes immediately on construction to buffer events, then drains the buffer
 // when the caller's subscribe() arrives (prevents race with fast completions).
-export const makePiSessionAdapter = (piSession: PiSessionLike): ActiveSession => {
+export const makePiSessionAdapter = (piSession: PiSessionLike, opts: { followUp?: boolean } = {}): ActiveSession => {
   const buffered: unknown[] = []
   let forward: ((e: unknown) => void) | null = null
 
@@ -32,6 +33,7 @@ export const makePiSessionAdapter = (piSession: PiSessionLike): ActiveSession =>
 
   return {
     steer: (text) => piSession.steer(text),
+    followUp: (text) => (piSession.followUp ?? piSession.steer)(text),
     abort: () => piSession.abort(),
     subscribe: (onDelta, onEnd, onError) => {
       // Tracks error from message_end so agent_end can route to onError instead of onEnd.
@@ -69,7 +71,7 @@ export const makePiSessionFactory = (deps: {
   authStorage: AuthStorage
   modelRegistry: ModelRegistry
   sessionManager: SessionManager
-}): SessionFactory => async (task, modelKey, cwd) => {
+}): SessionFactory => async (task, modelKey, cwd, followUp) => {
   const [provider, ...idParts] = modelKey.split('/')
   const id = idParts.join('/')
 
@@ -88,7 +90,11 @@ export const makePiSessionFactory = (deps: {
   // background task — tools.ts gets the session handle while the agent runs,
   // allowing store.add('running') to fire before the task completes.
   const adapted = makePiSessionAdapter(session)
-  session.prompt(task).catch(() => {})
+  if (followUp) {
+    session.followUp(task).catch(() => {})
+  } else {
+    session.prompt(task).catch(() => {})
+  }
   return adapted
 }
 
@@ -97,7 +103,7 @@ export const makePiClient = (
   modelRegistry: ModelRegistryLike,
   opts: { readSettings?: () => Promise<PiSettings> } = {}
 ): PiClient => ({
-  startSession: (task, modelKey, cwd) => factory(task, modelKey, cwd),
+  startSession: (task, modelKey, cwd, followUp) => factory(task, modelKey, cwd, followUp),
   listModels: async () => {
     const getSettings = opts.readSettings ?? readPiSettings
     const [models, settings] = await Promise.all([

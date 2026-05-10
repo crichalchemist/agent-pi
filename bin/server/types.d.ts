@@ -8,6 +8,7 @@ export type ModelInfo = {
 };
 export type ActiveSession = {
     steer: (text: string) => Promise<void>;
+    followUp: (text: string) => Promise<void>;
     abort: () => Promise<void>;
     subscribe: (onDelta: (text: string) => void, onEnd: () => void, onError: (message: string) => void) => () => void;
 };
@@ -27,9 +28,9 @@ export type SessionStore = {
     all: () => ReadonlyMap<string, SessionEntry>;
     dispose: () => void;
 };
-export type SessionFactory = (task: string, modelKey: string, cwd: string) => Promise<ActiveSession>;
+export type SessionFactory = (task: string, modelKey: string, cwd: string, followUp?: boolean) => Promise<ActiveSession>;
 export type PiClient = {
-    startSession: (task: string, modelKey: string, cwd: string) => Promise<ActiveSession>;
+    startSession: (task: string, modelKey: string, cwd: string, followUp?: boolean) => Promise<ActiveSession>;
     listModels: () => Promise<ModelInfo[]>;
 };
 export type PiError = {

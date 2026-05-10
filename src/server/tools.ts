@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto'
 import type { PiClient, PiError, SessionStore } from './types.js'
 import { makeSessionLogger } from './event-logger.js'
 
-type RunTaskParams   = { task: string; model: string; cwd?: string; timeout?: number }
-type SpawnParams     = { task: string; model: string; cwd?: string }
+type RunTaskParams   = { task: string; model: string; cwd?: string; timeout?: number; followUp?: boolean }
+type SpawnParams     = { task: string; model: string; cwd?: string; followUp?: boolean }
 type SessionIdParam  = { session_id: string }
 type SteerParams     = SessionIdParam & { message: string }
 
@@ -23,9 +23,10 @@ export const TOOL_SCHEMAS = [
       type: 'object',
       properties: {
         task:    { type: 'string', description: 'Task description for the Pi agent' },
-        model:   { type: 'string', description: 'Model key in provider/id format (e.g. google/gemini-2.0-flash)' },
+        model:   { type: 'string', description: 'Model key in "provider/model-id" format (e.g. google/gemini-2.0-flash, anthropic/claude-haiku-4-5, openai/gpt-4o)' },
         cwd:     { type: 'string', description: 'Working directory for the agent (defaults to Claude\'s cwd)' },
         timeout: { type: 'number', description: 'Timeout in ms (default 300000)' },
+        followUp: { type: 'boolean', description: 'If true, queues the message to be delivered after the agent finishes all work (non-interruptive). Default false.' },
       },
       required: ['task', 'model'],
     },
@@ -36,16 +37,29 @@ export const TOOL_SCHEMAS = [
     inputSchema: {
       type: 'object',
       properties: {
-        task:  { type: 'string' },
-        model: { type: 'string', description: 'Model key in provider/id format' },
+        task:  { type: 'string', description: 'Task description for the Pi agent' },
+        model: { type: 'string', description: 'Model key in "provider/model-id" format (e.g. anthropic/claude-sonnet-4-6, openai/gpt-4o)' },
         cwd:   { type: 'string' },
+        followUp: { type: 'boolean', description: 'If true, queues the message to be delivered after the agent finishes all work (non-interruptive). Default false.' },
       },
       required: ['task', 'model'],
     },
   },
   {
     name: 'pi_steer_agent',
-    description: 'Send a steering message to a running Pi agent.',
+    description: 'Send a steering message to a running Pi agent. Delivered after the current assistant turn finishes its tool calls. Use pi_followup_agent if you want to wait for full completion before sending.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session_id: { type: 'string' },
+        message:    { type: 'string' },
+      },
+      required: ['session_id', 'message'],
+    },
+  },
+  {
+    name: 'pi_followup_agent',
+    description: 'Queue a follow-up message for a spawned Pi agent. Delivered only after the agent finishes all work. Use this when you do not want to interrupt the agent at all.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -90,9 +104,9 @@ export const makeTools = (store: SessionStore, client: PiClient, opts: { session
       models: await client.listModels(),
     }),
 
-    pi_run_task: async ({ task, model, cwd, timeout = DEFAULT_TIMEOUT_MS }: RunTaskParams) => {
+    pi_run_task: async ({ task, model, cwd, timeout = DEFAULT_TIMEOUT_MS, followUp }: RunTaskParams) => {
       const resolvedCwd = cwd ?? process.cwd()
-      const session = await client.startSession(task, model, resolvedCwd)
+      const session = await client.startSession(task, model, resolvedCwd, followUp)
 
       return new Promise<{ output: string; timedOut?: true; error?: string }>((resolve) => {
         let output = ''
@@ -124,10 +138,10 @@ export const makeTools = (store: SessionStore, client: PiClient, opts: { session
       })
     },
 
-    pi_spawn_agent: async ({ task, model, cwd }: SpawnParams) => {
+    pi_spawn_agent: async ({ task, model, cwd, followUp }: SpawnParams) => {
       const session_id = randomUUID()
       const resolvedCwd = cwd ?? process.cwd()
-      const session = await client.startSession(task, model, resolvedCwd)
+      const session = await client.startSession(task, model, resolvedCwd, followUp)
 
       store.add(session_id, { session, output: '', status: 'running', createdAt: Date.now(), model })
 
@@ -174,6 +188,13 @@ export const makeTools = (store: SessionStore, client: PiClient, opts: { session
       const entry = store.get(session_id)
       if (!entry || entry.status !== 'running') return { ok: false }
       await entry.session.steer(message)
+      return { ok: true }
+    },
+
+    pi_followup_agent: async ({ session_id, message }: SteerParams) => {
+      const entry = store.get(session_id)
+      if (!entry || entry.status !== 'running') return { ok: false }
+      await entry.session.followUp(message)
       return { ok: true }
     },
 

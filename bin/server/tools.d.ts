@@ -4,11 +4,13 @@ type RunTaskParams = {
     model: string;
     cwd?: string;
     timeout?: number;
+    followUp?: boolean;
 };
 type SpawnParams = {
     task: string;
     model: string;
     cwd?: string;
+    followUp?: boolean;
 };
 type SessionIdParam = {
     session_id: string;
@@ -35,7 +37,7 @@ export declare const TOOL_SCHEMAS: readonly [{
             };
             readonly model: {
                 readonly type: "string";
-                readonly description: "Model key in provider/id format (e.g. google/gemini-2.0-flash)";
+                readonly description: "Model key in \"provider/model-id\" format (e.g. google/gemini-2.0-flash, anthropic/claude-haiku-4-5, openai/gpt-4o)";
             };
             readonly cwd: {
                 readonly type: "string";
@@ -44,6 +46,10 @@ export declare const TOOL_SCHEMAS: readonly [{
             readonly timeout: {
                 readonly type: "number";
                 readonly description: "Timeout in ms (default 300000)";
+            };
+            readonly followUp: {
+                readonly type: "boolean";
+                readonly description: "If true, queues the message to be delivered after the agent finishes all work (non-interruptive). Default false.";
             };
         };
         readonly required: readonly ["task", "model"];
@@ -56,20 +62,40 @@ export declare const TOOL_SCHEMAS: readonly [{
         readonly properties: {
             readonly task: {
                 readonly type: "string";
+                readonly description: "Task description for the Pi agent";
             };
             readonly model: {
                 readonly type: "string";
-                readonly description: "Model key in provider/id format";
+                readonly description: "Model key in \"provider/model-id\" format (e.g. anthropic/claude-sonnet-4-6, openai/gpt-4o)";
             };
             readonly cwd: {
                 readonly type: "string";
+            };
+            readonly followUp: {
+                readonly type: "boolean";
+                readonly description: "If true, queues the message to be delivered after the agent finishes all work (non-interruptive). Default false.";
             };
         };
         readonly required: readonly ["task", "model"];
     };
 }, {
     readonly name: "pi_steer_agent";
-    readonly description: "Send a steering message to a running Pi agent.";
+    readonly description: "Send a steering message to a running Pi agent. Delivered after the current assistant turn finishes its tool calls. Use pi_followup_agent if you want to wait for full completion before sending.";
+    readonly inputSchema: {
+        readonly type: "object";
+        readonly properties: {
+            readonly session_id: {
+                readonly type: "string";
+            };
+            readonly message: {
+                readonly type: "string";
+            };
+        };
+        readonly required: readonly ["session_id", "message"];
+    };
+}, {
+    readonly name: "pi_followup_agent";
+    readonly description: "Queue a follow-up message for a spawned Pi agent. Delivered only after the agent finishes all work. Use this when you do not want to interrupt the agent at all.";
     readonly inputSchema: {
         readonly type: "object";
         readonly properties: {
@@ -126,12 +152,12 @@ export declare const makeTools: (store: SessionStore, client: PiClient, opts?: {
         pi_list_models: (_args: Record<string, unknown>) => Promise<{
             models: import("./types.js").ModelInfo[];
         }>;
-        pi_run_task: ({ task, model, cwd, timeout }: RunTaskParams) => Promise<{
+        pi_run_task: ({ task, model, cwd, timeout, followUp }: RunTaskParams) => Promise<{
             output: string;
             timedOut?: true;
             error?: string;
         }>;
-        pi_spawn_agent: ({ task, model, cwd }: SpawnParams) => Promise<{
+        pi_spawn_agent: ({ task, model, cwd, followUp }: SpawnParams) => Promise<{
             session_id: `${string}-${string}-${string}-${string}-${string}`;
         }>;
         pi_poll_agent: ({ session_id }: SessionIdParam) => Promise<{
@@ -140,6 +166,9 @@ export declare const makeTools: (store: SessionStore, client: PiClient, opts?: {
             output: string;
         }>;
         pi_steer_agent: ({ session_id, message }: SteerParams) => Promise<{
+            ok: boolean;
+        }>;
+        pi_followup_agent: ({ session_id, message }: SteerParams) => Promise<{
             ok: boolean;
         }>;
         pi_get_result: ({ session_id }: SessionIdParam) => Promise<{
@@ -168,7 +197,7 @@ export declare const makeTools: (store: SessionStore, client: PiClient, opts?: {
                 };
                 readonly model: {
                     readonly type: "string";
-                    readonly description: "Model key in provider/id format (e.g. google/gemini-2.0-flash)";
+                    readonly description: "Model key in \"provider/model-id\" format (e.g. google/gemini-2.0-flash, anthropic/claude-haiku-4-5, openai/gpt-4o)";
                 };
                 readonly cwd: {
                     readonly type: "string";
@@ -177,6 +206,10 @@ export declare const makeTools: (store: SessionStore, client: PiClient, opts?: {
                 readonly timeout: {
                     readonly type: "number";
                     readonly description: "Timeout in ms (default 300000)";
+                };
+                readonly followUp: {
+                    readonly type: "boolean";
+                    readonly description: "If true, queues the message to be delivered after the agent finishes all work (non-interruptive). Default false.";
                 };
             };
             readonly required: readonly ["task", "model"];
@@ -189,20 +222,40 @@ export declare const makeTools: (store: SessionStore, client: PiClient, opts?: {
             readonly properties: {
                 readonly task: {
                     readonly type: "string";
+                    readonly description: "Task description for the Pi agent";
                 };
                 readonly model: {
                     readonly type: "string";
-                    readonly description: "Model key in provider/id format";
+                    readonly description: "Model key in \"provider/model-id\" format (e.g. anthropic/claude-sonnet-4-6, openai/gpt-4o)";
                 };
                 readonly cwd: {
                     readonly type: "string";
+                };
+                readonly followUp: {
+                    readonly type: "boolean";
+                    readonly description: "If true, queues the message to be delivered after the agent finishes all work (non-interruptive). Default false.";
                 };
             };
             readonly required: readonly ["task", "model"];
         };
     }, {
         readonly name: "pi_steer_agent";
-        readonly description: "Send a steering message to a running Pi agent.";
+        readonly description: "Send a steering message to a running Pi agent. Delivered after the current assistant turn finishes its tool calls. Use pi_followup_agent if you want to wait for full completion before sending.";
+        readonly inputSchema: {
+            readonly type: "object";
+            readonly properties: {
+                readonly session_id: {
+                    readonly type: "string";
+                };
+                readonly message: {
+                    readonly type: "string";
+                };
+            };
+            readonly required: readonly ["session_id", "message"];
+        };
+    }, {
+        readonly name: "pi_followup_agent";
+        readonly description: "Queue a follow-up message for a spawned Pi agent. Delivered only after the agent finishes all work. Use this when you do not want to interrupt the agent at all.";
         readonly inputSchema: {
             readonly type: "object";
             readonly properties: {

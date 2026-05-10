@@ -10,6 +10,7 @@ const MODELS: ModelInfo[] = [
 
 const makeSession = (overrides: Partial<ActiveSession> = {}): ActiveSession => ({
   steer: vi.fn(async () => {}),
+  followUp: vi.fn(async () => {}),
   abort: vi.fn(async () => {}),
   subscribe: vi.fn((onDelta, onEnd) => {
     // Default: immediately emit one delta then end
@@ -44,7 +45,7 @@ describe('pi_run_task', () => {
       cwd: '/tmp',
     })
 
-    expect(client.startSession).toHaveBeenCalledWith('do work', 'google/gemini-2.0-flash', '/tmp')
+    expect(client.startSession).toHaveBeenCalledWith('do work', 'google/gemini-2.0-flash', '/tmp', undefined)
     expect(result).toEqual({ output: 'result' })
   })
 
@@ -54,7 +55,7 @@ describe('pi_run_task', () => {
 
     await tools.pi_run_task({ task: 'x', model: 'google/gemini-2.0-flash' })
 
-    expect(client.startSession).toHaveBeenCalledWith('x', 'google/gemini-2.0-flash', process.cwd())
+    expect(client.startSession).toHaveBeenCalledWith('x', 'google/gemini-2.0-flash', process.cwd(), undefined)
   })
 
   it('resolves correctly when onEnd fires synchronously during subscribe (buffered fast completion)', async () => {

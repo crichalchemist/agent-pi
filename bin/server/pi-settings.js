@@ -11,10 +11,17 @@ export const readPiSettings = async (path = DEFAULT_SETTINGS_PATH) => {
         return {};
     }
 };
+const patternToRegex = (pattern) => {
+    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+    return new RegExp(`^${escaped}$`);
+};
 export const filterByEnabledModels = (models, settings) => {
     const { enabledModels } = settings;
     if (!enabledModels || enabledModels.length === 0)
         return models;
-    const enabled = new Set(enabledModels);
-    return models.filter(m => enabled.has(`${m.provider}/${m.id}`));
+    const patterns = enabledModels.map(patternToRegex);
+    return models.filter(m => {
+        const key = `${m.provider}/${m.id}`;
+        return patterns.some(re => re.test(key));
+    });
 };

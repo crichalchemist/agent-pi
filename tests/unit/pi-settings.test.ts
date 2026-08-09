@@ -87,4 +87,21 @@ describe('filterByEnabledModels', () => {
     filterByEnabledModels(models, { enabledModels: ['opencode-go/glm-5.1'] })
     expect(models).toEqual(original)
   })
+
+  it('matches provider-wide wildcard patterns (e.g. "provider/*")', () => {
+    const result = filterByEnabledModels(models, {
+      enabledModels: ['github-copilot/*'],
+    })
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('gpt-4o')
+  })
+
+  it('matches partial-id wildcard patterns (e.g. "provider/prefix-*")', () => {
+    const result = filterByEnabledModels(
+      [...models, { provider: 'opencode-go', id: 'glm-5.2' }],
+      { enabledModels: ['opencode-go/glm-5.*'] }
+    )
+    expect(result).toHaveLength(2)
+    expect(result.map(m => m.id)).toEqual(['glm-5.1', 'glm-5.2'])
+  })
 })

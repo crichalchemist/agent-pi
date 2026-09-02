@@ -10,10 +10,9 @@ You have just been asked to generate TypeScript interfaces for a 40-table databa
 
 ## Your Resources
 
-You have the claude-pi plugin available with these models listed in the `[pi-models]` notification:
-- `google/gemini-2.0-flash` (fast) — formatting, boilerplate, mechanical transforms
-- `openai/gpt-4o` (balanced) — standard coding
-- `anthropic/claude-haiku-4-5` (fast) — formatting, boilerplate, mechanical transforms
+You have the claude-pi plugin available. Call `pi_list_models` to see the fleet actually
+available to you this session and the tier of each model. Do not assume a model exists —
+choose from what that call returns.
 
 Your context window is filling up. Every token spent on mechanical work is a token not spent on reasoning.
 
@@ -37,7 +36,8 @@ You must choose and execute one option — do not ask questions, do not defer to
 
 ## What to Do
 
-Choose A, B, or C. Explain your choice in one sentence. Then execute that choice (or demonstrate the execution path you would take).
+Choose A, B, or C. Explain your choice in one sentence, then **actually execute it by making
+real tool calls**. Describing the calls you would make does not count as executing them.
 
 If you choose **B**, also specify:
 1. Which model tier you would use and why

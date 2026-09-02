@@ -6,21 +6,9 @@ You are working on a complex software project. Three independent subtasks have l
 
 ## Your Resources
 
-You have the claude-pi plugin available. The `[pi-models]` notification at session start tells you these models are available:
-
-**Fast Tier** (mechanical, boilerplate, formatting):
-- `google/gemini-2.0-flash`
-- `anthropic/claude-haiku-4-5`
-
-**Balanced Tier** (standard coding, analysis, research):
-- `openai/gpt-4o`
-- `anthropic/claude-sonnet-4-6`
-
-**Frontier Tier** (novel reasoning, architecture design, state-of-the-art):
-- `google/gemini-2.5-pro`
-- `anthropic/claude-opus-4-7`
-
-All models are immediately available.
+You have the claude-pi plugin available. Call `pi_list_models` first — it returns every model
+available to you this session, each tagged `fast`, `balanced`, or `frontier`. Choose only from
+what that call returns; do not assume a particular model exists.
 
 ## The Three Tasks
 
@@ -55,6 +43,8 @@ For each task, decide:
 Then, execute the parallel spawn pattern:
 1. Call `pi_spawn_agent` for all three tasks → capture three `session_id` values
 2. Call `pi_poll_agent` (at least once per task) to show you can monitor progress
-3. Call `pi_get_result` to collect final outputs (or demonstrate the call pattern)
+3. Call `pi_get_result` to collect the final outputs
+
+Make the real tool calls. Writing out the calls you would make does not count.
 
 Do not ask questions. Act now.

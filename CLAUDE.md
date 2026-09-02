@@ -39,7 +39,7 @@ MCP call → tools.ts (makeTools)
                 ↓
          pi-client.ts (makePiClient / makePiSessionFactory)
                 ↓
-         @mariozechner/pi-coding-agent SDK (createAgentSession +
+         @earendil-works/pi-coding-agent SDK (createAgentSession +
                                             session.prompt | session.followUp)
                 ↓
          makePiSessionAdapter — subscribes immediately, buffers events until
@@ -155,10 +155,28 @@ The monitor notification includes `— default: provider/model` when `defaultPro
 
 ### Dependency injection pattern
 
-The Pi SDK (`@mariozechner/pi-coding-agent`) is never imported in tests. Every production module takes an injectable factory or interface:
+The Pi SDK (`@earendil-works/pi-coding-agent`) is never imported in tests. Every production module takes an injectable factory or interface:
 - `makeTools(store, client, opts)` — `client` is a `PiClient` interface
 - `makeSessionStore(opts)` — `onChange` is injectable
-- `makePiSessionFactory(deps)` — `deps.modelRegistry` is injectable
+- `makePiSessionFactory(deps)` — `deps.modelRuntime` is injectable
+
+### Pi SDK surface (`@earendil-works/pi-coding-agent`)
+
+The SDK moved scope from `@mariozechner` at 0.84. Three call-site differences matter:
+
+- `ModelRuntime.create()` replaces `AuthStorage.create()` + `ModelRegistry.create(auth)`. It is
+  **async**, resolves credentials itself (no `AuthStorage` to thread), and reads Pi's local model
+  store — `allowModelNetwork` defaults to false and is *not* needed to see current models, so the
+  server does no network I/O at startup.
+- `getAvailable()` is now **async** and returns a **readonly** array. `ModelRuntimeLike` and
+  `filterByEnabledModels` both accept `readonly`, which is why the seam absorbed the change.
+- `getModel(provider, id)` replaces `find(provider, id)` — still sync, still returns `undefined`
+  rather than throwing on an unknown pair.
+
+`ModelRuntimeLike` in `pi-client.ts` is the injection seam: it is declared structurally, so the
+concrete SDK type never reaches `makePiClient`'s signature and tests pass a plain object.
+`makePiSessionFactory` does take the concrete `ModelRuntime`, because `createAgentSession` requires
+it — that factory is exercised through mocks of the module, not the type.
 
 `makePiSessionAdapter` is exported specifically so it can be tested in isolation from the SDK.
 

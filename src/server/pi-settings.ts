@@ -28,11 +28,12 @@ const patternToRegex = (pattern: string): RegExp => {
 }
 
 export const filterByEnabledModels = <T extends { provider: string; id: string }>(
-  models: T[],
+  models: readonly T[],
   settings: PiSettings
 ): T[] => {
   const { enabledModels } = settings
-  if (!enabledModels || enabledModels.length === 0) return models
+  // ModelRuntime.getAvailable() hands back a readonly array; copy so the result is mutable.
+  if (!enabledModels || enabledModels.length === 0) return [...models]
   const patterns = enabledModels.map(patternToRegex)
   return models.filter(m => {
     const key = `${m.provider}/${m.id}`

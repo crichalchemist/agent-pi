@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { makePiClient, makePiSessionAdapter, makePiSessionFactory } from '../../src/server/pi-client.js'
-import { createAgentSession } from '@mariozechner/pi-coding-agent'
+import { createAgentSession } from '@earendil-works/pi-coding-agent'
 import type { ActiveSession, ModelInfo, SessionFactory } from '../../src/server/types.js'
 
-vi.mock('@mariozechner/pi-coding-agent', () => ({
+vi.mock('@earendil-works/pi-coding-agent', () => ({
   createAgentSession: vi.fn(),
-  AuthStorage: class {},
-  ModelRegistry: class {},
+  ModelRuntime: class {},
   SessionManager: class {},
 }))
 
@@ -37,8 +36,8 @@ const makeActiveSession = (): ActiveSession => ({
   subscribe: vi.fn(() => () => {}),
 })
 
-// Mock modelRegistry — no Pi SDK import needed in tests
-const mockModelRegistry = {
+// Mock modelRuntime — no Pi SDK import needed in tests
+const mockModelRuntime = {
   getAvailable: vi.fn(async () => [
     { provider: 'google', id: 'gemini-2.5-pro' },
     { provider: 'google', id: 'gemini-2.0-flash' },
@@ -49,7 +48,7 @@ const mockModelRegistry = {
 describe('makePiClient', () => {
   it('startSession calls factory with task, modelKey, and cwd', async () => {
     const factory: SessionFactory = vi.fn(async () => makeActiveSession())
-    const client = makePiClient(factory, mockModelRegistry)
+    const client = makePiClient(factory, mockModelRuntime)
 
     await client.startSession('do the thing', 'google/gemini-2.0-flash', '/tmp')
 
@@ -59,14 +58,14 @@ describe('makePiClient', () => {
   it('startSession returns the ActiveSession from the factory', async () => {
     const session = makeActiveSession()
     const factory: SessionFactory = async () => session
-    const client = makePiClient(factory, mockModelRegistry)
+    const client = makePiClient(factory, mockModelRuntime)
 
     const result = await client.startSession('task', 'google/gpt-4o', '/tmp')
     expect(result).toBe(session)
   })
 
   it('listModels returns ModelInfo with key, provider, id, tier', async () => {
-    const client = makePiClient(vi.fn(), mockModelRegistry, { readSettings: async () => ({}) })
+    const client = makePiClient(vi.fn(), mockModelRuntime, { readSettings: async () => ({}) })
     const models = await client.listModels()
 
     expect(models).toEqual([
@@ -89,7 +88,7 @@ describe('makePiClient', () => {
     const readSettings = vi.fn(async () => ({
       enabledModels: ['google/gemini-2.5-pro', 'openai/gpt-4o'],
     }))
-    const client = makePiClient(vi.fn(), mockModelRegistry, { readSettings })
+    const client = makePiClient(vi.fn(), mockModelRuntime, { readSettings })
     const models = await client.listModels()
 
     expect(models).toHaveLength(2)
@@ -98,14 +97,14 @@ describe('makePiClient', () => {
 
   it('listModels returns all models when enabledModels is absent in settings', async () => {
     const readSettings = vi.fn(async () => ({}))
-    const client = makePiClient(vi.fn(), mockModelRegistry, { readSettings })
+    const client = makePiClient(vi.fn(), mockModelRuntime, { readSettings })
     const models = await client.listModels()
     expect(models).toHaveLength(3)
   })
 
   it('listModels returns all models when readSettings throws', async () => {
     const readSettings = vi.fn(async () => { throw new Error('read failed') })
-    const client = makePiClient(vi.fn(), mockModelRegistry, { readSettings })
+    const client = makePiClient(vi.fn(), mockModelRuntime, { readSettings })
     const models = await client.listModels()
     expect(models).toHaveLength(3)
   })
@@ -223,8 +222,7 @@ describe('makePiSessionFactory', () => {
     vi.mocked(createAgentSession).mockResolvedValue({ session: piSession } as any)
 
     const factory = makePiSessionFactory({
-      authStorage:    {} as any,
-      modelRegistry:  { find: vi.fn().mockReturnValue({ provider: 'google', id: 'flash' }) } as any,
+      modelRuntime:   { getModel: vi.fn().mockReturnValue({ provider: 'google', id: 'flash' }) } as any,
       sessionManager: {} as any,
     })
 
@@ -245,8 +243,7 @@ describe('makePiSessionFactory', () => {
     vi.mocked(createAgentSession).mockResolvedValue({ session: piSession } as any)
 
     const factory = makePiSessionFactory({
-      authStorage:    {} as any,
-      modelRegistry:  { find: vi.fn().mockReturnValue({ provider: 'google', id: 'flash' }) } as any,
+      modelRuntime:   { getModel: vi.fn().mockReturnValue({ provider: 'google', id: 'flash' }) } as any,
       sessionManager: {} as any,
     })
 
@@ -271,8 +268,7 @@ describe('makePiSessionFactory', () => {
     vi.mocked(createAgentSession).mockResolvedValue({ session: piSession } as any)
 
     const factory = makePiSessionFactory({
-      authStorage:    {} as any,
-      modelRegistry:  { find: vi.fn().mockReturnValue({ provider: 'google', id: 'flash' }) } as any,
+      modelRuntime:   { getModel: vi.fn().mockReturnValue({ provider: 'google', id: 'flash' }) } as any,
       sessionManager: {} as any,
     })
 

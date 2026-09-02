@@ -7,4 +7,4 @@ export declare const readPiSettings: (path?: string) => Promise<PiSettings>;
 export declare const filterByEnabledModels: <T extends {
     provider: string;
     id: string;
-}>(models: T[], settings: PiSettings) => T[];
+}>(models: readonly T[], settings: PiSettings) => T[];

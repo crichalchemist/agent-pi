@@ -20,8 +20,9 @@ const patternToRegex = (pattern) => {
 };
 export const filterByEnabledModels = (models, settings) => {
     const { enabledModels } = settings;
+    // ModelRuntime.getAvailable() hands back a readonly array; copy so the result is mutable.
     if (!enabledModels || enabledModels.length === 0)
-        return models;
+        return [...models];
     const patterns = enabledModels.map(patternToRegex);
     return models.filter(m => {
         const key = `${m.provider}/${m.id}`;

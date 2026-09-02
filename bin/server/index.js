@@ -1,15 +1,17 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, } from '@modelcontextprotocol/sdk/types.js';
-import { AuthStorage, ModelRegistry, SessionManager } from '@mariozechner/pi-coding-agent';
+import { ModelRuntime, SessionManager } from '@earendil-works/pi-coding-agent';
 import { makeSessionStore } from './session-store.js';
 import { makePiClient, makePiSessionFactory } from './pi-client.js';
 import { makeTools } from './tools.js';
 import { makeStatusWriter } from './status-writer.js';
-const authStorage = AuthStorage.create();
-const modelRegistry = ModelRegistry.create(authStorage);
+// ModelRuntime.create() reads Pi's local model store and resolves credentials itself —
+// no AuthStorage to thread through. It stays off the network by default (allowModelNetwork
+// is false), so this adds ~40ms of local I/O before server.connect(), not a network round trip.
+const modelRuntime = await ModelRuntime.create();
 const sessionManager = SessionManager.inMemory();
-const sessionDeps = { authStorage, modelRegistry, sessionManager };
+const sessionDeps = { modelRuntime, sessionManager };
 // writeStatus is assigned after store creation; onChange only fires post-construction
 let writeStatus;
 const store = makeSessionStore({
@@ -17,7 +19,7 @@ const store = makeSessionStore({
 });
 writeStatus = makeStatusWriter({ store });
 const factory = makePiSessionFactory(sessionDeps);
-const client = makePiClient(factory, modelRegistry);
+const client = makePiClient(factory, modelRuntime);
 const { tools: toolHandlers, schemas } = makeTools(store, client);
 // Each handler has a specific typed params interface (RunTaskParams, SpawnParams, etc.) to keep
 // tool implementations type-safe internally. At the MCP dispatch boundary we need a uniform

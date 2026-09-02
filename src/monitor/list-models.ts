@@ -2,14 +2,14 @@ import { fileURLToPath } from 'node:url'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { AuthStorage, ModelRegistry } from '@mariozechner/pi-coding-agent'
+import { ModelRuntime } from '@earendil-works/pi-coding-agent'
 import { getTier } from '../server/types.js'
 import { readPiSettings, filterByEnabledModels, type PiSettings } from '../server/pi-settings.js'
 
 type ModelLike = { provider: string; id: string }
 
 type RunOpts = {
-  getAvailable?: () => ModelLike[] | Promise<ModelLike[]>
+  getAvailable?: () => readonly ModelLike[] | Promise<readonly ModelLike[]>
   readSettings?: () => Promise<PiSettings>
   detectSuperpowers?: () => Promise<boolean>
   output?: (line: string) => void
@@ -34,10 +34,9 @@ const formatLine = (models: ModelLike[], settings: PiSettings): string => {
   return `${LOG_PREFIX} Available: ${parts}${defaultKey} — use ${REFRESH_TOOL} to refresh`
 }
 
-const defaultGetAvailable = (): ModelLike[] => {
-  const authStorage = AuthStorage.create()
-  const modelRegistry = ModelRegistry.create(authStorage)
-  return modelRegistry.getAvailable()
+const defaultGetAvailable = async (): Promise<readonly ModelLike[]> => {
+  const modelRuntime = await ModelRuntime.create()
+  return modelRuntime.getAvailable()
 }
 
 const defaultDetectSuperpowers = async (): Promise<boolean> => {

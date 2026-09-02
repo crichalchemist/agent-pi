@@ -1,4 +1,4 @@
-import { createAgentSession, } from '@mariozechner/pi-coding-agent';
+import { createAgentSession, } from '@earendil-works/pi-coding-agent';
 import { getTier } from './types.js';
 import { readPiSettings, filterByEnabledModels } from './pi-settings.js';
 // Exported for unit testing — adapts any PiSession-like object to ActiveSession.
@@ -61,14 +61,15 @@ export const makePiSessionAdapter = (piSession, opts = {}) => {
 export const makePiSessionFactory = (deps) => async (task, modelKey, cwd, followUp) => {
     const [provider, ...idParts] = modelKey.split('/');
     const id = idParts.join('/');
-    const model = deps.modelRegistry.find(provider, id);
+    // getModel is the 0.84 replacement for ModelRegistry.find — still sync, still
+    // returns undefined (not a throw) when the provider/id pair is unknown.
+    const model = deps.modelRuntime.getModel(provider, id);
     if (!model)
         throw { kind: 'model_not_found', model: modelKey };
     const { session } = await createAgentSession({
         model,
         cwd,
-        authStorage: deps.authStorage,
-        modelRegistry: deps.modelRegistry,
+        modelRuntime: deps.modelRuntime,
         sessionManager: deps.sessionManager,
     });
     // Adapter subscribes immediately and buffers events, so fire prompt as a
@@ -83,12 +84,12 @@ export const makePiSessionFactory = (deps) => async (task, modelKey, cwd, follow
     }
     return adapted;
 };
-export const makePiClient = (factory, modelRegistry, opts = {}) => ({
+export const makePiClient = (factory, modelRuntime, opts = {}) => ({
     startSession: (task, modelKey, cwd, followUp) => factory(task, modelKey, cwd, followUp),
     listModels: async () => {
         const getSettings = opts.readSettings ?? readPiSettings;
         const [models, settings] = await Promise.all([
-            modelRegistry.getAvailable(),
+            modelRuntime.getAvailable(),
             getSettings().catch(() => ({})),
         ]);
         return filterByEnabledModels(models, settings).map((m) => ({

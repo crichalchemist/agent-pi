@@ -4,7 +4,7 @@ type ModelLike = {
     id: string;
 };
 type RunOpts = {
-    getAvailable?: () => ModelLike[] | Promise<ModelLike[]>;
+    getAvailable?: () => readonly ModelLike[] | Promise<readonly ModelLike[]>;
     readSettings?: () => Promise<PiSettings>;
     detectSuperpowers?: () => Promise<boolean>;
     output?: (line: string) => void;

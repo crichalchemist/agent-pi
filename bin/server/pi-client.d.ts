@@ -1,14 +1,15 @@
-import { AuthStorage, ModelRegistry, SessionManager } from '@mariozechner/pi-coding-agent';
+import { ModelRuntime, SessionManager } from '@earendil-works/pi-coding-agent';
 import type { ActiveSession, PiClient, SessionFactory } from './types.js';
 import { type PiSettings } from './pi-settings.js';
-type ModelRegistryLike = {
-    getAvailable: () => Array<{
+type ModelRuntimeLike = {
+    getAvailable: () => ReadonlyArray<{
         provider: string;
         id: string;
-    }> | PromiseLike<Array<{
+    }> | PromiseLike<ReadonlyArray<{
         provider: string;
         id: string;
     }>>;
+    getModel: (provider: string, id: string) => unknown;
 };
 type PiSessionLike = {
     steer: (text: string) => Promise<void>;
@@ -20,11 +21,10 @@ export declare const makePiSessionAdapter: (piSession: PiSessionLike, opts?: {
     followUp?: boolean;
 }) => ActiveSession;
 export declare const makePiSessionFactory: (deps: {
-    authStorage: AuthStorage;
-    modelRegistry: ModelRegistry;
+    modelRuntime: ModelRuntime;
     sessionManager: SessionManager;
 }) => SessionFactory;
-export declare const makePiClient: (factory: SessionFactory, modelRegistry: ModelRegistryLike, opts?: {
+export declare const makePiClient: (factory: SessionFactory, modelRuntime: ModelRuntimeLike, opts?: {
     readSettings?: () => Promise<PiSettings>;
 }) => PiClient;
 export {};

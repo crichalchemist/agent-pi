@@ -101,9 +101,12 @@ const writeMcpConfig = (real) => {
   // dir — otherwise an unsupervised Pi agent writes into this repo.
   const sandbox = join(WORK, 'agent-cwd')
   mkdirSync(sandbox, { recursive: true })
+  // Keep per-session JSONL out of the user's real ~/.claude/claude-pi/sessions — an eval run
+  // is not a session they started, and its logs should not show up in their history.
+  const env = { PI_SESSIONS_DIR: join(WORK, 'sessions') }
   const server = real
-    ? { command: 'sh', args: ['-c', `cd ${JSON.stringify(sandbox)} && exec node ${JSON.stringify(join(REPO, 'bin', 'server', 'index.js'))}`] }
-    : { command: 'node', args: [join(REPO, 'tests', 'eval', 'stub-pi-server.mjs')] }
+    ? { command: 'sh', args: ['-c', `cd ${JSON.stringify(sandbox)} && exec node ${JSON.stringify(join(REPO, 'bin', 'server', 'index.js'))}`], env }
+    : { command: 'node', args: [join(REPO, 'tests', 'eval', 'stub-pi-server.mjs')], env }
   writeFileSync(path, JSON.stringify({ mcpServers: { pi: server } }, null, 2) + '\n')
   return path
 }

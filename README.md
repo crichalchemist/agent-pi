@@ -61,7 +61,7 @@ Claude reads this notification and routes tasks to the appropriate tier.
 
 ### MCP tools
 
-The plugin registers seven tools on the `pi` MCP server:
+The plugin registers eight tools on the `pi` MCP server:
 
 | Tool | Description |
 |------|-------------|
@@ -94,21 +94,30 @@ The plugin ships two skills:
 
 ## Status line
 
-The plugin adds a live status line to Claude Code showing running and recently completed Pi agents:
+The plugin adds a live status line to Claude Code showing in-flight Pi agents, the models they are
+running on, and total accumulated output:
 
 ```
-● 2 running  ✓ 3 done
+Pi: 2 running (gemini-2.0-flash, gpt-4o) | 12.3KB
 ```
+
+The line is written by `scripts/statusline.sh`, which prints nothing when no agent is running.
 
 ## Development
 
 ```bash
 npm install
-npm test          # 80 unit tests
+npm test          # 92 unit tests
 npm run build     # compile src/ → bin/
+npm run eval      # behavioral evals (drives real Claude sessions)
 ```
 
 Tests use [vitest](https://vitest.dev). The Pi SDK is never imported in tests — all external dependencies are injectable.
+
+`npm run eval` is separate and much slower: it uses `claude-session-driver` to launch a real
+Claude Code session, feeds it a scenario from `tests/scenarios/`, and asserts on which Pi tools
+the session actually called. It runs against a stub Pi server by default (no token spend); pass
+`--real` to delegate to your live Pi fleet. Run `npm run build` first — the evals load `bin/`.
 
 ## License
 

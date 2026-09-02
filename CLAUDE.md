@@ -15,6 +15,15 @@ Run a single test file:
 npx vitest run tests/unit/tools.test.ts
 ```
 
+Behavioral evals are separate — they drive real Claude Code sessions, so they are slow and
+never part of `npm test` (`vitest.config.ts` includes only `tests/unit/**`):
+
+```bash
+npm run build && npm run eval          # all cases, stubbed Pi, free
+npm run eval -- --only model-selection # one case
+npm run eval -- --real                 # delegate to the LIVE Pi fleet (spends tokens)
+```
+
 ## Architecture
 
 This is a Claude Code plugin (`claude-pi`) that exposes a Pi agent orchestration layer as an MCP server. There are two runtime entry points:
@@ -30,13 +39,81 @@ MCP call → tools.ts (makeTools)
                 ↓
          pi-client.ts (makePiClient / makePiSessionFactory)
                 ↓
-         @mariozechner/pi-coding-agent SDK (createAgentSession + session.prompt)
+         @mariozechner/pi-coding-agent SDK (createAgentSession +
+                                            session.prompt | session.followUp)
                 ↓
          makePiSessionAdapter — subscribes immediately, buffers events until
          tools.ts calls adapted.subscribe(), then drains synchronously
 ```
 
 `session.prompt(task)` is fire-and-forget (`.catch(() => {})`) inside `makePiSessionFactory` — this is intentional. The adapter's pre-subscription buffer makes it safe and allows `store.add('running')` to fire before the task completes, which is what drives the statusline.
+
+### steer vs. followUp
+
+Two delivery semantics, distinct all the way down:
+
+- **steer** (`pi_steer_agent`) — interrupts; Pi delivers it once the current assistant turn
+  finishes its tool calls.
+- **followUp** (`pi_followup_agent`, and the `followUp: true` flag on `pi_run_task` /
+  `pi_spawn_agent`) — never interrupts; delivered only after the agent finishes all work.
+
+The `followUp` boolean threads through the whole stack — tool schema → `RunTaskParams`/`SpawnParams`
+→ `PiClient.startSession` → `SessionFactory` → the `session.followUp(task)` vs `session.prompt(task)`
+branch in `makePiSessionFactory`. Any similar flag has to touch all five.
+
+The `?? steer` fallback in `makePiSessionAdapter` covers only the `pi_followup_agent` path.
+`makePiSessionFactory` calls `session.followUp(task)` on the raw SDK session, so `followUp: true`
+at spawn time is unprotected if the SDK ever drops the method.
+
+### Model tier classification
+
+`getTier` in `types.ts` maps a model id to `fast | balanced | frontier` with no network call and no
+hardcoded model list — it is deliberately pattern-based so new Pi model names classify without a code
+change. Order: exact match in `MODEL_TIER_OVERRIDES` (the escape hatch for names that don't classify
+cleanly, e.g. `o3` vs `o3-mini`), then a regex against the **provider-stripped** name
+(`google/gemini-2.5-pro` → `gemini-2.5-pro`), defaulting to `balanced`.
+
+Both consumers depend on it — `pi-client.ts` (`listModels`) and `monitor/list-models.ts` (the
+session-start notification) — so a change here shifts what Claude sees at session start *and* what
+`pi_list_models` returns mid-session. `tests/unit/types.test.ts` covers the classification table.
+
+### Behavioral evals
+
+Unit tests prove the MCP server works. `tests/eval/` answers a different question — does the
+**orchestrate skill actually change Claude's delegation behavior** — and it can only be answered
+by driving a real session and watching which tools get called.
+
+`tests/eval/run-evals.mjs` uses [claude-session-driver](https://github.com/obra/superpowers)
+(`csd`) to launch a Claude worker in tmux, sends it a scenario from `tests/scenarios/`, then
+asserts on csd's `pre_tool_use` **event stream** — not on the worker's prose. A worker will
+happily describe a delegation plan it never executed; the event stream records only real calls.
+
+Three things make this work, and each is load-bearing:
+
+- **`--mcp-config <stub> --strict-mcp-config`** points the `pi` server at
+  `tests/eval/stub-pi-server.mjs`, which registers the *real* `TOOL_SCHEMAS` and `makeTools`
+  dispatch from `bin/` behind a canned `PiClient`. Tool calls are genuine; the Pi spend is zero.
+  `--strict-mcp-config` is required — without it the project `.mcp.json` loads the real server too.
+- **Worker cwd is the repo**, which is already trusted. A scratch dir would stall the worker on
+  Claude Code's folder-trust prompt, and pre-trusting one means editing `~/.claude.json`.
+- **Tiers are asserted through the real `getTier()`**, never a hardcoded model list, so the
+  assertions hold against whatever fleet Pi actually serves. Scenarios call `pi_list_models`
+  rather than naming models, for the same reason. Note the circularity: the stub labels tiers
+  with `getTier` and the eval asserts with `getTier`, so a `getTier` regression flows into both
+  sides and passes. The eval tests *which model Claude picked*, not that the label was right —
+  `tests/unit/types.test.ts` is what guards classification.
+
+Arms: `delegation/green` and `model-selection/green` are scored; `delegation/red` (MCP tools
+present, skill *absent*) is reported as an unscored baseline — delegating without the skill is a
+fine outcome, just not one to assert on. The old `--no-plugins` baseline was replaced because it
+removed the tools entirely and so measured plugin absence rather than skill absence.
+
+`--real` swaps the stub for `bin/server/index.js`, started in a scratch cwd so live Pi agents
+don't write into the repo. The runner also diffs `git status` around the run and warns loudly if
+a worker dirtied the tree.
+
+These are LLM evals: a single run is stochastic, so one failure is a prompt to re-run, not proof
+of a regression.
 
 ### Pi settings integration
 
@@ -89,10 +166,17 @@ The Pi SDK (`@mariozechner/pi-coding-agent`) is never imported in tests. Every p
 
 `tsc` compiles `src/` → `bin/` preserving the directory structure. `bin/` is committed to the repo so users can install the plugin without a build step.
 
+**`bin/` is what actually runs.** The MCP wrapper execs `$INSTALL_PATH/bin/server/index.js` and
+`monitors/monitors.json` runs `bin/monitor/list-models.js` — nothing loads `src/` at runtime. A `src/`
+edit has zero effect until `npm run build`, and committing without it lands a src/bin mismatch in the
+repo. Run `npm run build` before committing any `src/` change.
+
+`tsconfig.json` excludes `tests/` — `npm run build` does not typecheck the test suite.
+
 ## Key env vars
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `PI_SESSIONS_DIR` | `~/.claude/claude-pi/sessions` | Override JSONL session log directory |
 | `PI_SESSION_TTL_MS` | `1800000` (30 min) | Session entry TTL in the store |
-| `STATUS_FILE` | `~/.claude/claude-pi/status.json` | Override statusline reads this file |
+| `STATUS_FILE` | `~/.claude/claude-pi/status.json` | Read by `scripts/statusline.sh` only — **does not redirect writes**; `status-writer.ts` has no env override (inject `statusDir` instead) |

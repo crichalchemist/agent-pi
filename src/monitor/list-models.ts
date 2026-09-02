@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { ModelRuntime } from '@earendil-works/pi-coding-agent'
 import { getTier } from '../server/types.js'
-import { readPiSettings, filterByEnabledModels, type PiSettings } from '../server/pi-settings.js'
+import { readPiSettings, filterByEnabledModels, hasSubagents, type PiSettings } from '../server/pi-settings.js'
 
 type ModelLike = { provider: string; id: string }
 
@@ -25,6 +25,9 @@ const NO_MODELS_MSG =
 
 const SUPERPOWERS_HINT =
   `${LOG_PREFIX} superpowers detected — load ${SUPERPOWERS_SKILL} skill for diverse agentic workflow integration`
+
+const SUBAGENTS_HINT =
+  `${LOG_PREFIX} pi-subagents detected — delegated agents can fan out further via their own \`subagent\` tool`
 
 const formatLine = (models: ModelLike[], settings: PiSettings): string => {
   const parts = models.map(m => `${m.id} (${getTier(m.id)})`).join(', ')
@@ -74,6 +77,7 @@ export const run = async (opts: RunOpts = {}): Promise<void> => {
       output(formatLine(models, settings))
       const hasSuperPowers = await detectSuperpowers().catch(() => false)
       if (hasSuperPowers) output(SUPERPOWERS_HINT)
+      if (hasSubagents(settings)) output(SUBAGENTS_HINT)
     }
     exit(0)
   } catch (err) {

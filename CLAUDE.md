@@ -126,6 +126,40 @@ of a regression.
 
 The monitor notification includes `— default: provider/model` when `defaultProvider` + `defaultModel` are set in Pi settings, giving Claude an explicit starting point for delegation without tier inference.
 
+### Nested delegation (pi-subagents)
+
+[pi-subagents](https://github.com/nicobailon/pi-subagents) gives a Pi agent a `subagent` tool, so an
+agent this plugin spawns can spawn its own children. **This needs no code in `pi-client.ts` and never
+did** — it works because of what `createAgentSession` is *not* told:
+
+- `resourceLoader` is omitted, so `DefaultResourceLoader` is used. It resolves user-scope packages
+  through `packageManager.resolve()`, reading `~/.pi/agent/settings.json` → `packages`.
+- neither `tools` nor `noTools` is passed, so extension tools stay registered *and* active alongside
+  the built-in read/bash/edit/write set.
+- `agentDir` is omitted, so it defaults to `~/.pi/agent` — the same config the Pi CLI uses.
+
+`pi install npm:pi-subagents` appends `"npm:pi-subagents"` to `settings.packages` and unpacks into
+`~/.pi/agent/npm/node_modules/`. It does **not** write to `~/.pi/agent/extensions/`, so detection reads
+the packages array — that is what `hasSubagents` in `pi-settings.ts` checks, and what the monitor's
+second hint line reports.
+
+**Only user-scope packages work here.** `DefaultResourceLoader.loadProjectTrustExtensions()` forces
+project settings untrusted during the bootstrap pass, deliberately keeping project-local
+extensions out unless a `resolveProjectTrust` callback grants trust. The MCP server is
+non-interactive and passes no such callback, so anything installed with `pi install -l` (project
+scope, `<cwd>/.pi/`) will silently not load. Diagnosing that as a bug wastes a session — it is by
+design.
+
+Verified end to end against the live SDK, not inferred: a `pi_run_task` agent called
+`subagent { action: "list" }` and got the real agent roster back, and a second run delegated to the
+`worker` agent and returned the child's answer.
+
+**Known limitation, accepted deliberately:** `session-store.ts` and the status line model exactly one
+level of Pi sessions. Grandchildren are invisible to `pi_poll_agent`, `pi_steer_agent` and
+`pi_terminate_agent`, and their token spend is not counted in the status line. Depth and concurrency
+control belong to pi-subagents' own config, not here — do not add a nested-session tracking layer to
+this plugin without a concrete reason.
+
 ### In-memory session state
 
 `session-store.ts` (`makeSessionStore`) holds all live and recently-completed sessions as an immutable-entry `Map<string, SessionEntry>`. Every mutation calls `onChange`, which triggers `status-writer.ts` to atomically write `~/.claude/claude-pi/status.json` via a tmp-rename pattern. `scripts/statusline.sh` reads that file to render the Claude Code status bar line.

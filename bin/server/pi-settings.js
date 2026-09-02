@@ -1,6 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+// pi-subagents registers a `subagent` tool that lets a delegated Pi agent spawn its own
+// children. It is discovered through settings.packages (pi install writes the source
+// string there), not through the extensions/ directory.
+export const SUBAGENTS_PACKAGE = 'npm:pi-subagents';
+export const hasSubagents = (settings) => (settings.packages ?? []).includes(SUBAGENTS_PACKAGE);
 const DEFAULT_SETTINGS_PATH = join(homedir(), '.pi', 'agent', 'settings.json');
 export const readPiSettings = async (path = DEFAULT_SETTINGS_PATH) => {
     try {

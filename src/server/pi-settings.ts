@@ -19,12 +19,20 @@ export const readPiSettings = async (path = DEFAULT_SETTINGS_PATH): Promise<PiSe
   }
 }
 
+const patternToRegex = (pattern: string): RegExp => {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')
+  return new RegExp(`^${escaped}$`)
+}
+
 export const filterByEnabledModels = <T extends { provider: string; id: string }>(
   models: T[],
   settings: PiSettings
 ): T[] => {
   const { enabledModels } = settings
   if (!enabledModels || enabledModels.length === 0) return models
-  const enabled = new Set(enabledModels)
-  return models.filter(m => enabled.has(`${m.provider}/${m.id}`))
+  const patterns = enabledModels.map(patternToRegex)
+  return models.filter(m => {
+    const key = `${m.provider}/${m.id}`
+    return patterns.some(re => re.test(key))
+  })
 }

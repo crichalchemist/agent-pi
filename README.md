@@ -113,6 +113,23 @@ The plugin ships two skills:
 
 **`skills/superpowers/SKILL.md`** — routes superpowers workflow roles to Pi. Spec compliance reviewers, code quality reviewers, and parallel investigation agents are read-only and context-independent — ideal for Pi. Implementer subagents that need `Edit`/`Bash` stay on the `Agent` tool. Invoke with `/claude-pi:superpowers`.
 
+### Nested delegation (optional)
+
+If you install [pi-subagents](https://github.com/nicobailon/pi-subagents), agents this plugin spawns
+can spawn their own children:
+
+```bash
+pi install npm:pi-subagents
+```
+
+The plugin detects it at session start and tells Claude, which then delegates whole problems and lets
+the agent split them, rather than splitting every problem itself. Nothing to configure — install it
+and the capability appears. Install it at user scope; `pi install -l` (project scope) will not load,
+because the MCP server cannot answer Pi's project-trust prompt.
+
+Child agents are not tracked by `pi_poll_agent` or the status line, and their spend is not shown
+there — bound the fan-out in the task description.
+
 ## Status line
 
 The plugin adds a live status line to Claude Code showing in-flight Pi agents, the models they are

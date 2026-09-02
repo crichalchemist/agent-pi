@@ -170,6 +170,61 @@ describe('list-models monitor', () => {
     expect(output).toHaveBeenCalledOnce()
   })
 
+  describe('pi-subagents detection', () => {
+    const withSubagents = async () => ({ packages: ['npm:pi-subagents'] })
+
+    it('emits hint line when pi-subagents is an installed package', async () => {
+      const output = vi.fn()
+      const exit = vi.fn()
+
+      await run({
+        getAvailable: () => [{ provider: 'google', id: 'gemini-2.5-pro' }],
+        readSettings: withSubagents,
+        detectSuperpowers: noDetect,
+        output,
+        exit,
+      })
+
+      expect(output).toHaveBeenCalledTimes(2)
+      expect(output.mock.calls[1][0]).toBe(
+        '[pi-models] pi-subagents detected — delegated agents can fan out further via their own `subagent` tool'
+      )
+    })
+
+    it('no hint when pi-subagents is not installed', async () => {
+      const output = vi.fn()
+      const exit = vi.fn()
+
+      await run({
+        getAvailable: () => [{ provider: 'google', id: 'gemini-2.5-pro' }],
+        readSettings: async () => ({ packages: ['npm:pi-intercom'] }),
+        detectSuperpowers: noDetect,
+        output,
+        exit,
+      })
+
+      expect(output).toHaveBeenCalledOnce()
+    })
+
+    // The hint follows the models line, so a fleet with no models must stay silent —
+    // announcing nested delegation is misleading when nothing can be delegated at all.
+    it('no hint when no models are available', async () => {
+      const output = vi.fn()
+      const exit = vi.fn()
+
+      await run({
+        getAvailable: () => [],
+        readSettings: withSubagents,
+        detectSuperpowers: noDetect,
+        output,
+        exit,
+      })
+
+      expect(output).toHaveBeenCalledOnce()
+      expect(output.mock.calls[0][0]).toContain('No models available')
+    })
+  })
+
   describe('superpowers detection', () => {
     it('emits hint line when superpowers detected and models available', async () => {
       const output = vi.fn()

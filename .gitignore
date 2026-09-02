@@ -1,4 +1,6 @@
+.remember/
 node_modules/
 *.js.map
 .claude/
+.serena/
 .mcp.json

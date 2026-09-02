@@ -104,4 +104,13 @@ describe('filterByEnabledModels', () => {
     expect(result).toHaveLength(2)
     expect(result.map(m => m.id)).toEqual(['glm-5.1', 'glm-5.2'])
   })
+
+  it('treats regex metacharacters as literals rather than throwing', () => {
+    // Only `*` is a glob token. An unescaped `?` is a quantifier, and a pattern
+    // opening with one used to throw SyntaxError out of the session-start monitor,
+    // taking down model listing entirely instead of simply matching nothing.
+    expect(() => filterByEnabledModels(models, { enabledModels: ['?'] })).not.toThrow()
+    expect(filterByEnabledModels(models, { enabledModels: ['?'] })).toEqual([])
+    expect(filterByEnabledModels(models, { enabledModels: ['github-copilot/gpt-4o?'] })).toEqual([])
+  })
 })

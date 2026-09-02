@@ -1,6 +1,12 @@
 # claude-pi
 
-A Claude Code plugin that turns [Pi](https://pi.dev) into a multi-agent orchestration layer. Run diverse agentic workflows by coordinating a fleet of AI models — Gemini, GPT-4, Claude Haiku, and others — in parallel, outside your context window.
+[![CI](https://github.com/crichalchemist/agent-pi/actions/workflows/ci.yml/badge.svg)](https://github.com/crichalchemist/agent-pi/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/crichalchemist/agent-pi?sort=semver)](https://github.com/crichalchemist/agent-pi/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+A Claude Code plugin that turns [Pi](https://pi.dev) into a multi-agent orchestration layer. Run
+diverse agentic workflows by coordinating a fleet of AI models in parallel, outside your context
+window — whichever providers you have configured in Pi.
 
 ## What it does
 
@@ -39,7 +45,17 @@ claude /plugin install github:crichalchemist/agent-pi
 
 No build step required — compiled files are included in the repository.
 
-The plugin patches `~/.claude/CLAUDE.md` to instruct Claude to lead with Pi for multi-agent workflows, and writes `.mcp.json` in the current project directory to register the MCP server.
+Installing touches three things outside this repository:
+
+- `~/.claude/settings.json` — sets `statusLine.command`
+- `~/.claude/CLAUDE.md` — appends a sentinel-guarded block telling Claude to lead with Pi
+- `./.mcp.json` — registers the MCP server in the project you install from
+
+To reverse all three:
+
+```bash
+claude /plugin uninstall claude-pi
+```
 
 ## How it works
 
@@ -48,16 +64,21 @@ The plugin patches `~/.claude/CLAUDE.md` to instruct Claude to lead with Pi for 
 When a Claude Code session opens, the plugin runs a one-shot script that queries Pi for available models and delivers a notification before any user interaction:
 
 ```
-[pi-models] Available: gemini-2.5-pro (frontier), gemini-2.0-flash (fast), gpt-4o (balanced) — default: google/gemini-2.5-pro — use pi_list_models to refresh
+[pi-models] Available: <model> (frontier), <model> (balanced), <model> (fast) — default: <provider>/<model> — use pi_list_models to refresh
 ```
 
-Claude reads this notification and routes tasks to the appropriate tier.
+Claude reads this notification and routes tasks to the appropriate tier. Your line lists whatever
+models *your* Pi install actually serves — the plugin pins no model list of its own.
 
-| Tier | Examples | Best for |
-|------|----------|---------|
-| fast | gemini-2.0-flash, claude-haiku-4-5, gpt-4o-mini | Formatting, boilerplate, retrieval, mechanical transforms |
-| balanced | gpt-4o, claude-sonnet-4-6, o3-mini | Standard coding, analysis, review, research |
-| frontier | gemini-2.5-pro, claude-opus-4-7, o3 | Novel reasoning, architecture, security review, state-of-the-art tasks |
+| Tier | Typically matches | Best for |
+|------|-------------------|---------|
+| fast | names containing `flash`, `haiku`, `mini`, `nano` | Formatting, boilerplate, retrieval, mechanical transforms |
+| balanced | anything unmatched — the default | Standard coding, analysis, review, research |
+| frontier | names containing `opus`, `pro`, `thinking` | Novel reasoning, architecture, security review |
+
+Tiers are derived from the model name by pattern, not from a hardcoded list, so a newly released
+model classifies correctly without a plugin update. A small override table handles names that
+don't classify cleanly (`o3` is frontier, `o3-mini` is balanced).
 
 ### MCP tools
 
@@ -114,11 +135,11 @@ npm run eval      # behavioral evals (drives real Claude sessions)
 
 Tests use [vitest](https://vitest.dev). The Pi SDK is never imported in tests — all external dependencies are injectable.
 
-`npm run eval` is separate and much slower: it uses `claude-session-driver` to launch a real
-Claude Code session, feeds it a scenario from `tests/scenarios/`, and asserts on which Pi tools
-the session actually called. It runs against a stub Pi server by default (no token spend); pass
-`--real` to delegate to your live Pi fleet. Run `npm run build` first — the evals load `bin/`.
+`npm run eval` is a separate, slower check: it drives a real Claude Code session and asserts on
+which Pi tools that session actually called, verifying the skills change delegation behavior
+rather than just reading well. It runs against a stub Pi server by default, so it costs nothing.
+See [CLAUDE.md](CLAUDE.md) for its design.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
